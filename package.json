@@ -1,14 +1,14 @@
 {
-  "name": "geckocpp",
-  "displayName": "Gecko C++ Intellisense Configuration Provider",
-  "description": "A C++ intellisense provider for the Gecko source code.",
+  "name": "mozillscpp",
+  "displayName": "Mozilla C++ Intellisense Provider",
+  "description": "A C++ intellisense provider for the Mozilla source code.",
   "version": "0.1.0",
   "publisher": "fractalbrew",
   "repository": {
     "type": "git",
-    "url": "https://github.com/FractalBrew/vscode-geckocpp.git"
+    "url": "https://github.com/FractalBrew/vscode-mozillacpp.git"
   },
-  "homepage": "https://github.com/FractalBrew/vscode-geckocpp/blob/master/README.md",
+  "homepage": "https://github.com/FractalBrew/vscode-mozillacpp/blob/master/README.md",
   "engines": {
     "vscode": "^1.35.0"
   },
@@ -28,27 +28,27 @@
   ],
   "activationEvents": [
     "workspaceContains:mach",
-    "onCommand:geckocpp.resetIntellisense"
+    "onCommand:mozillacpp.resetIntellisense"
   ],
-  "main": "./out/extension.js",
+  "main": "./out/main.js",
   "contributes": {
     "commands": [
       {
-        "command": "geckocpp.resetIntellisense",
+        "command": "mozillacpp.resetIntellisense",
         "title": "Reset Intellisense",
         "category": "Gecko"
       }
     ],
     "configuration": {
       "type": "object",
-      "title": "Gecko Intellisense",
+      "title": "Mozilla Intellisense",
       "properties": {
-        "geckocpp.mach": {
+        "mozillacpp.mach": {
           "type": "string",
           "default": "",
           "description": "The path to a custom mach to use."
         },
-        "geckocpp.mach_env": {
+        "mozillacpp.mach_env": {
           "type": "object",
           "default": {},
           "description": "Environment variables to set before running mach."
