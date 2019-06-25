@@ -1,6 +1,6 @@
 {
-  "name": "vscode-geckocpp",
-  "displayName": "Gecko C++ Configuration Provider",
+  "name": "geckocpp",
+  "displayName": "Gecko C++ Intellisense Configuration Provider",
   "description": "A C++ intellisense provider for the Gecko source code.",
   "version": "0.1.0",
   "publisher": "fractalbrew",
@@ -23,6 +23,9 @@
     "mach"
   ],
   "icon": "icon.png",
+  "extensionDependency": [
+    "vscode.cpptools"
+  ],
   "activationEvents": [
     "workspaceContains:mach",
     "onCommand:geckocpp.resetIntellisense"
@@ -35,7 +38,23 @@
         "title": "Reset Intellisense",
         "category": "Gecko"
       }
-    ]
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Gecko Intellisense",
+      "properties": {
+        "geckocpp.mach": {
+          "type": "string",
+          "default": "",
+          "description": "The path to a custom mach to use."
+        },
+        "geckocpp.mach_env": {
+          "type": "object",
+          "default": {},
+          "description": "Environment variables to set before running mach."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -43,6 +62,9 @@
     "watch": "tsc -watch -p ./",
     "postinstall": "node ./node_modules/vscode/bin/install",
     "test": "npm run compile && node ./node_modules/vscode/bin/test"
+  },
+  "dependencies": {
+    "split-string": "^6.1.0"
   },
   "devDependencies": {
     "typescript": "^3.3.1",
