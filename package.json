@@ -1,0 +1,56 @@
+{
+  "name": "vscode-geckocpp",
+  "displayName": "Gecko C++ Configuration Provider",
+  "description": "A C++ intellisense provider for the Gecko source code.",
+  "version": "0.1.0",
+  "publisher": "fractalbrew",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FractalBrew/vscode-geckocpp.git"
+  },
+  "homepage": "https://github.com/FractalBrew/vscode-geckocpp/blob/master/README.md",
+  "engines": {
+    "vscode": "^1.35.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "c++",
+    "Mozilla",
+    "Firefox",
+    "Gecko",
+    "mach"
+  ],
+  "icon": "icon.png",
+  "activationEvents": [
+    "workspaceContains:mach",
+    "onCommand:geckocpp.resetIntellisense"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "geckocpp.resetIntellisense",
+        "title": "Reset Intellisense",
+        "category": "Gecko"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "postinstall": "node ./node_modules/vscode/bin/install",
+    "test": "npm run compile && node ./node_modules/vscode/bin/test"
+  },
+  "devDependencies": {
+    "typescript": "^3.3.1",
+    "vscode": "^1.1.28",
+    "tslint": "^5.12.1",
+    "@types/node": "^10.12.21",
+    "@types/mocha": "^2.2.42",
+    "vscode-cpptools": "^2.1.2",
+    "vscode-jsonrpc": "3.5.0"
+  }
+}
