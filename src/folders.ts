@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import * as cpptools from 'vscode-cpptools';
 
 import { Workspace } from './workspace';
+import { log } from './logging';
 
 function fsStat(path: string): Promise<fs.Stats> {
   return new Promise((resolve, reject) => {
@@ -40,7 +41,7 @@ class ProcessError extends Error {
 }
 
 function exec(command: string, args: string[], options?: SpawnOptions): Promise<ProcessResult> {
-  console.debug(`mozillacpp: ${command} ${args.join(' ')}`);
+  log.debug(`Executing '${command} ${args.join(' ')}'`);
   return new Promise((resolve, reject) => {
     let process = spawn(command, args, options);
 
@@ -62,8 +63,8 @@ function exec(command: string, args: string[], options?: SpawnOptions): Promise<
       if (code === 0) {
         resolve(output);
       } else {
-        console.warn(`mozillacpp: Executing ${command} ${args.join(' ')} failed with code ${code}`);
-        console.debug('mozillacpp: Command output', output);
+        log.warn(`Executing '${command} ${args.join(' ')}' failed with code ${code}`);
+        log.debug('Command output', output);
         output.code = code;
         reject(new ProcessError(`${command} ${args.join(' ')}`, output));
       }
@@ -114,7 +115,7 @@ export class WorkspaceFolder {
         let env = JSON.parse((await mach(machPath, ['environment', '--format', 'json'])).stdout);
         topobjdir = env.topobjdir;
       } catch (e) {
-        console.error(`mozillacpp: Error getting ${folder.uri.fsPath} objdir.`, e);
+        log.error(`Error getting ${folder.uri.fsPath} objdir.`, e);
       }
     }
 

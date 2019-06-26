@@ -22,7 +22,8 @@ identify both cases and warn you accordingly.
 
 ## Configuration
 
-The only configuration options available at this time control the execution of
-`mach`. If for some reason you want to use a different `mach` to that in the
-source code (maybe a script to set some things up) you can provide one. You can
-also provide environment variables to whatever is run as `mach`.
+* `mozillacpp.compiler` overrides the detected compiler.
+* `mozillacpp.mach` overrides the detected `mach`, useful for supplying a script to configure your build.
+* `mozillacpp.mach_env` sets environment variables to use when running `mach`. These are merged with the existing process environment.
+* `mozillacpp.log_level` sets the log level that will show up in the Output panel.
+* `mozillacpp.log_show_level` sets a log level that will cause the Output panel to appear.

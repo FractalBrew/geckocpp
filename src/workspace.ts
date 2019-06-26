@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 import { WorkspaceFolder } from './folders';
 import { MachConfigurationProvider } from './provider';
+import { log } from './logging';
 
 export class Workspace {
   machCount: number = 0;
@@ -45,7 +46,7 @@ export class Workspace {
   private async removeFolder(wFolder: vscode.WorkspaceFolder) {
     let promise = this.folders.get(wFolder.uri);
     if (!promise) {
-      console.warn('mozillacpp: Attempted to remove an unknown workspace folder.');
+      log.warn('Attempted to remove an unknown workspace folder.');
       return;
     }
 

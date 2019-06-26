@@ -5,6 +5,7 @@ const split = require('split-string');
 
 import { WorkspaceFolder } from './folders';
 import { Workspace } from './workspace';
+import { log } from './logging';
 
 const C_VERSION = 'c++11';
 
@@ -95,7 +96,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
     let arg;
     while (arg = args.shift()) {
       if (arg.length < 2 || (arg.charAt(0) !== '-' && arg.charAt(0) !== '/')) {
-        console.warn(`Skipping unknown argument: ${JSON.stringify(args)}`);
+        log.warn(`Skipping unknown argument: ${JSON.stringify(args)}`);
         continue;
       }
 
@@ -130,12 +131,13 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
       let folder = await this.workspace.getFolder(uri);
       return folder !== undefined && folder.canProvideConfig();
     } catch (e) {
-      console.error('mozillacpp: Failed to canProvildeConfiguration.', e);
+      log.error('Failed to canProvildeConfiguration.', e);
       return false;
     }
   }
 
   public async provideConfigurations(uris: vscode.Uri[]): Promise<cpptools.SourceFileConfigurationItem[]> {
+    log.warn('foo');
     let results: (undefined|cpptools.SourceFileConfigurationItem)[] = await Promise.all(uris.map(async (uri) => {
       try {
         let folder = await this.workspace.getFolder(uri);
@@ -149,7 +151,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
             try {
               return this.parseConfigFromCmdLine(output.stdout);
             } catch (e) {
-              console.error('mozillacpp: Failed to parse command line.', e);
+              log.error('Failed to parse command line.', e);
               return undefined;
             }
           } catch (e) {
@@ -161,15 +163,18 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
         });
 
         if (config === undefined) {
+          log.debug(`Unable to find configuration for ${uri.fsPath}.`);
           return config;
         }
+
+        log.debug(`Returning configuration for ${uri.fsPath}.`, config);
 
         return {
           uri: uri,
           configuration: config,
         };
       } catch (e) {
-        console.error('mozillacpp: Failed to generate configuration.', e);
+        log.error('Failed to generate configuration.', e);
         return undefined;
       }
     }));
@@ -185,7 +190,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
     try {
       return this.workspace.canProvideConfig();
     } catch (e) {
-      console.error('mozillacpp: Failed to canProvideBrowseConfiguration.', e);
+      log.error('Failed to canProvideBrowseConfiguration.', e);
       return false;
     }
   }
@@ -206,12 +211,15 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
         browsePath.push(folder.getTopObjDir());
       }
 
-      return {
+      let config = {
         browsePath,
         compilerPath,
       };
+
+      log.debug('Returning browse configuration.', config);
+      return config;
     } catch (e) {
-      console.error('mozillacpp: Failed to provideBrowseConfiguration.', e);
+      log.error('Failed to provideBrowseConfiguration.', e);
       throw(e);
     }
   }
@@ -234,7 +242,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
         return args[0];
       }
     } catch (e) {
-      console.error('mozillacpp: Failed to get compiler path.', e);
+      log.error('Failed to get compiler path.', e);
     }
 
     return undefined;

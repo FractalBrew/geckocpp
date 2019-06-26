@@ -46,17 +46,34 @@
         "mozillacpp.compiler": {
           "type": "string",
           "default": "",
-          "description": "Override the automatically detected compiler."
+          "description": "Override the automatically detected compiler.",
+          "scope": "window"
         },
         "mozillacpp.mach": {
           "type": "string",
           "default": "",
-          "description": "The path to a custom mach to use."
+          "description": "The path to a custom mach to use.",
+          "scope": "window"
         },
         "mozillacpp.mach_env": {
           "type": "object",
           "default": {},
-          "description": "Environment variables to set before running mach."
+          "description": "Environment variables to set before running mach.",
+          "scope": "window"
+        },
+        "mozillacpp.log_level": {
+          "type": "string",
+          "enum": ["never", "debug", "log", "warn", "error", "none"],
+          "default": "warn",
+          "description": "The level of logging shown in the Output window.",
+          "scope": "window"
+        },
+        "mozillacpp.log_show_level": {
+          "type": "string",
+          "enum": ["never", "debug", "log", "warn", "error", "none"],
+          "default": "none",
+          "description": "A log of this level will cause the Output channel to open automatically.",
+          "scope": "window"
         }
       }
     }
