@@ -137,7 +137,6 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
   }
 
   public async provideConfigurations(uris: vscode.Uri[]): Promise<cpptools.SourceFileConfigurationItem[]> {
-    log.warn('foo');
     let results: (undefined|cpptools.SourceFileConfigurationItem)[] = await Promise.all(uris.map(async (uri) => {
       try {
         let folder = await this.workspace.getFolder(uri);
