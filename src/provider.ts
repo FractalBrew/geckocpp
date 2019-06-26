@@ -77,13 +77,19 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
   private parseConfigFromCmdLine(cmdline: string): cpptools.SourceFileConfiguration {
     let args = splitCmdLine(cmdline);
 
+    let config = vscode.workspace.getConfiguration('mozillacpp');
+    let compiler: string|undefined = config.get('compiler');
+    if (!compiler) {
+      compiler = args.shift();
+    }
+
     let configItem: cpptools.SourceFileConfiguration = {
       includePath: [],
       defines: [],
       intelliSenseMode: 'clang-x64',
       standard: C_VERSION,
       forcedInclude: [],
-      compilerPath: args.shift(),
+      compilerPath: compiler,
     };
 
     let arg;
@@ -215,6 +221,12 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
   }
 
   private async getCompilerPath(folder: WorkspaceFolder): Promise<string|undefined> {
+    let config = vscode.workspace.getConfiguration('mozillacpp');
+    let compiler: string|undefined = config.get('compiler');
+    if (compiler) {
+      return compiler;
+    }
+
     try {
       let output = await folder.mach(['compileflags', folder.getTopSrcDir()]);
       let args = splitCmdLine(output.stdout);

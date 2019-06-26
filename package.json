@@ -43,6 +43,11 @@
       "type": "object",
       "title": "Mozilla Intellisense",
       "properties": {
+        "mozillacpp.compiler": {
+          "type": "string",
+          "default": "",
+          "description": "Override the automatically detected compiler."
+        },
         "mozillacpp.mach": {
           "type": "string",
           "default": "",
