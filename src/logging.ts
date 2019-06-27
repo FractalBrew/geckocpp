@@ -55,23 +55,25 @@ class Logger {
   }
 
   shouldOpen(level: Level): boolean {
-    return level >= config.getLogLevel();
-  }
-
-  shouldOutput(level: Level): boolean {
     return level >= config.getLogShowLevel();
   }
 
+  shouldOutput(level: Level): boolean {
+    return level >= config.getLogLevel();
+  }
+
   output(level: Level, ...args: any[]): void {
+    let levelstr: string = Level[level];
+
     switch (level) {
       case Level.Warn:
-        console.warn('mozillacpp:', ...args);
+        console.warn(`mozillacpp ${levelstr}:`, ...args);
         break;
       case Level.Error:
-        console.error('mozillacpp:', ...args);
+        console.error(`mozillacpp ${levelstr}:`, ...args);
         break;
       default:
-        console.log('mozillacpp:', ...args);
+        console.log(`mozillacpp ${levelstr}:`, ...args);
         break;
     }
 
@@ -79,7 +81,7 @@ class Logger {
       return;
     }
 
-    this.channel.appendLine(args.map(serialize).join(' '));
+    this.channel.appendLine(`${levelstr}: ${args.map(serialize).join(' ')}`);
 
     if (this.shouldOpen(level)) {
       this.channel.show(true);
