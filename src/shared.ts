@@ -4,7 +4,8 @@
 
 import * as cpptools from 'vscode-cpptools';
 
-import split from 'split-string';
+import { Options } from 'split-string';
+let split: (str: string, options: Options) => string[] = require('split-string');
 
 import { log } from './logging';
 

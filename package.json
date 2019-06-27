@@ -74,6 +74,12 @@
           "description": "Environment variables to set before running mach.",
           "scope": "window"
         },
+        "mozillacpp.tag.disable": {
+          "type": "boolean",
+          "default": false,
+          "description": "Disables the C++ tag parser.",
+          "scope": "window"
+        },
         "mozillacpp.log_level": {
           "type": "string",
           "enum": [

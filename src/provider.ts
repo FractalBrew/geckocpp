@@ -127,6 +127,14 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
   }
 
   public async provideBrowseConfiguration(): Promise<cpptools.WorkspaceBrowseConfiguration> {
+    let config: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration('mozillacpp');
+    if (config.get('tag.disable')) {
+      log.debug('Disabling browse path.');
+      return {
+        browsePath: [],
+      };
+    }
+
     try {
       let folders: WorkspaceFolder[] = await this.workspace.getMachFolders();
 
