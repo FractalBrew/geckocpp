@@ -35,6 +35,7 @@ issue.
 ## Known issues
 
 Generally check the [Github issues](https://github.com/FractalBrew/vscode-mozillacpp/issues).
+
 The main issue of note is that it seems to [take a while for Visual Studio Code
 to catch up with changes to the build configuration](https://github.com/FractalBrew/vscode-mozillacpp/issues/8).
 This doesn't appear to be an issue that this extension can do anything about

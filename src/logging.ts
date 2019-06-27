@@ -50,6 +50,10 @@ class Logger {
     this.channel = vscode.window.createOutputChannel(name);
   }
 
+  dispose(): void {
+    this.channel.dispose();
+  }
+
   shouldOpen(level: Level): boolean {
     return level >= config.getLogLevel();
   }

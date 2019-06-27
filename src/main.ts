@@ -4,17 +4,21 @@
 
 import * as vscode from 'vscode';
 
-import { gWorkspace } from './workspace';
+import { workspace } from './workspace';
+import { config } from './config';
+import { log } from './logging';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   context.subscriptions.push(
+    config,
+    log,
+    workspace,
     vscode.commands.registerCommand('mozillacpp.resetIntellisense', () => {
-      gWorkspace.resetConfiguration();
-      gWorkspace.resetBrowseConfiguration();
+      workspace.resetConfiguration();
+      workspace.resetBrowseConfiguration();
     })
   );
 }
 
 export function deactivate(): void {
-  gWorkspace.dispose();
 }

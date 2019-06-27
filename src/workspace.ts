@@ -28,6 +28,11 @@ export class Workspace {
     if (this.provider) {
       this.provider.dispose();
     }
+
+    for (let folder of this.folders.values()) {
+      folder.then((f) => f.dispose());
+    }
+    this.folders.clear();
   }
 
   private async addFolder(wFolder: vscode.WorkspaceFolder): Promise<void> {
@@ -98,4 +103,4 @@ export class Workspace {
   }
 }
 
-export let gWorkspace: Workspace = new Workspace();
+export let workspace: Workspace = new Workspace();

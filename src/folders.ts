@@ -230,6 +230,9 @@ export class SourceFolder {
     this.environmentInfo = environmentInfo;
   }
 
+  public dispose(): void {
+  }
+
   public async mach(args: string[]): Promise<ProcessResult> {
     if (!this.environmentInfo) {
       throw new Error(`Mach does not exist for the folder ${this.folder.uri}`);

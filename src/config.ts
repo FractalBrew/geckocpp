@@ -37,17 +37,17 @@ function levelFromStr(name: string|undefined, normal: Level): Level {
 }
 
 class Configuration {
-  root: vscode.WorkspaceConfiguration;
-
   constructor() {
-    this.root = vscode.workspace.getConfiguration('mozillacpp');
+  }
+
+  dispose(): void {
   }
 
   private getRoot(uri?: vscode.Uri): vscode.WorkspaceConfiguration {
     if (uri) {
       return vscode.workspace.getConfiguration('mozillacpp', uri);
     } else {
-      return this.root;
+      return vscode.workspace.getConfiguration('mozillacpp');
     }
   }
 
