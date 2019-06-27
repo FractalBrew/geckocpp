@@ -1,33 +1,12 @@
+import * as path from 'path';
 
 import * as cpptools from 'vscode-cpptools';
 import * as vscode from 'vscode';
-const split = require('split-string');
 
 import { WorkspaceFolder } from './folders';
 import { Workspace } from './workspace';
 import { log } from './logging';
-
-const C_VERSION = 'c++11';
-
-function splitCmdLine(cmdline: string): string[] {
-  let stripQuotes = (s: string): string => {
-    if (s.length < 2) {
-      return s;
-    }
-
-    if ((s.startsWith('\'') && s.endsWith('\'')) ||
-        (s.startsWith('"') && s.endsWith('"'))) {
-      return s.substring(1, s.length - 2);
-    }
-
-    return s;
-  };
-
-  return split(cmdline.trim(), {
-    quotes: true,
-    separator: ' ',
-  }).map(stripQuotes);
-}
+import { splitCmdLine, parseConfigFromCmdLine, CompilerInfo } from './shared';
 
 export class MachConfigurationProvider implements cpptools.CustomConfigurationProvider {
   api: cpptools.CppToolsApi;
@@ -75,57 +54,6 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
     this.api.didChangeCustomBrowseConfiguration(this);
   }
 
-  private parseConfigFromCmdLine(cmdline: string): cpptools.SourceFileConfiguration {
-    let args = splitCmdLine(cmdline);
-
-    let config = vscode.workspace.getConfiguration('mozillacpp');
-    let compiler: string|undefined = config.get('compiler');
-    if (!compiler) {
-      compiler = args.shift();
-    }
-
-    let configItem: cpptools.SourceFileConfiguration = {
-      includePath: [],
-      defines: [],
-      intelliSenseMode: 'clang-x64',
-      standard: C_VERSION,
-      forcedInclude: [],
-      compilerPath: compiler,
-    };
-
-    let arg;
-    while (arg = args.shift()) {
-      if (arg.length < 2 || (arg.charAt(0) !== '-' && arg.charAt(0) !== '/')) {
-        log.warn(`Skipping unknown argument: ${JSON.stringify(args)}`);
-        continue;
-      }
-
-      switch (arg.charAt(1)) {
-        case 'D':
-          configItem.defines.push(arg.substring(2));
-          continue;
-        case 'I':
-          configItem.includePath.push(arg.substring(2));
-          continue;
-      }
-
-      if (arg === '-include') {
-        let include = args.shift();
-        if (include && configItem.forcedInclude) {
-          configItem.forcedInclude.push(include);
-        }
-        continue;
-      }
-
-      if (arg === '-isysroot') {
-        args.shift();
-      }
-    }
-
-    return configItem;
-  }
-
-
   async canProvideConfiguration(uri: vscode.Uri): Promise<boolean> {
     try {
       let folder = await this.workspace.getFolder(uri);
@@ -133,6 +61,23 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
     } catch (e) {
       log.error('Failed to canProvildeConfiguration.', e);
       return false;
+    }
+  }
+
+  private async getConfiguration(folder: WorkspaceFolder, compilerInfo: CompilerInfo, path: string): Promise<cpptools.SourceFileConfiguration|undefined> {
+    try {
+      let output = await folder.mach(['compileflags', path]);
+      try {
+        return parseConfigFromCmdLine(compilerInfo, output.stdout);
+      } catch (e) {
+        log.error('Failed to parse command line.', e);
+        return undefined;
+      }
+    } catch (e) {
+      if (e.result.stdout.trim() === 'Your tree has not been built yet. Please run |mach build| with no arguments.') {
+        this.showError('You must compile before Mozilla Intellisense will work.');
+      }
+      return undefined;
     }
   }
 
@@ -144,22 +89,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
           return undefined;
         }
 
-        let config = await folder.getCachedConfiguration(uri, async (folder: WorkspaceFolder, path: string): Promise<cpptools.SourceFileConfiguration|undefined> => {
-          try {
-            let output = await folder.mach(['compileflags', path]);
-            try {
-              return this.parseConfigFromCmdLine(output.stdout);
-            } catch (e) {
-              log.error('Failed to parse command line.', e);
-              return undefined;
-            }
-          } catch (e) {
-            if (e.result.stdout.trim() === 'Your tree has not been built yet. Please run |mach build| with no arguments.') {
-              this.showError('You must compile before Mozilla Intellisense will work.');
-            }
-            return undefined;
-          }
-        });
+        let config = await folder.getCachedConfiguration(uri, this.getConfiguration.bind(this));
 
         if (config === undefined) {
           log.debug(`Unable to find configuration for ${uri.fsPath}.`);
@@ -198,21 +128,19 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
     try {
       let folders = await this.workspace.getMachFolders();
 
-      let browsePath: string[] = [];
-      let compilerPath: string|undefined = undefined;
+      let browsePath: Set<string> = new Set();
 
       for (let folder of folders) {
-        if (!compilerPath) {
-          compilerPath = await this.getCompilerPath(folder);
+        for (let path of folder.getIncludePaths()) {
+          browsePath.add(path);
         }
 
-        browsePath.push(folder.getTopSrcDir());
-        browsePath.push(folder.getTopObjDir());
+        browsePath.add(folder.getTopSrcDir());
+        browsePath.add(folder.getTopObjDir());
       }
 
       let config = {
-        browsePath,
-        compilerPath,
+        browsePath: Array.from(browsePath),
       };
 
       log.debug('Returning browse configuration.', config);
@@ -225,25 +153,5 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
 
   public dispose() {
     this.api.dispose();
-  }
-
-  private async getCompilerPath(folder: WorkspaceFolder): Promise<string|undefined> {
-    let config = vscode.workspace.getConfiguration('mozillacpp');
-    let compiler: string|undefined = config.get('compiler');
-    if (compiler) {
-      return compiler;
-    }
-
-    try {
-      let output = await folder.mach(['compileflags', folder.getTopSrcDir()]);
-      let args = splitCmdLine(output.stdout);
-      if (args.length > 0) {
-        return args[0];
-      }
-    } catch (e) {
-      log.error('Failed to get compiler path.', e);
-    }
-
-    return undefined;
   }
 }

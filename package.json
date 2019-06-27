@@ -43,10 +43,16 @@
       "type": "object",
       "title": "Mozilla Intellisense",
       "properties": {
-        "mozillacpp.compiler": {
+        "mozillacpp.compiler.cpp": {
           "type": "string",
           "default": "",
-          "description": "Override the automatically detected compiler.",
+          "description": "Override the automatically detected compiler for cpp files.",
+          "scope": "window"
+        },
+        "mozillacpp.compiler.c": {
+          "type": "string",
+          "default": "",
+          "description": "Override the automatically detected compiler for c files.",
           "scope": "window"
         },
         "mozillacpp.mach": {
