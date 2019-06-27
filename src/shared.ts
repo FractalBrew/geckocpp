@@ -1,4 +1,3 @@
-import * as vscode from 'vscode';
 import * as cpptools from 'vscode-cpptools';
 
 const split = require('split-string');
