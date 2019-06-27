@@ -1,5 +1,10 @@
 # Mozilla C++ intellisense provider for Visual Studio Code
 
+[![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/fractalbrew.mozillacpp.svg?style=popout)](https://marketplace.visualstudio.com/items?itemName=fractalbrew.mozillacpp)
+[![Blocking issues](https://img.shields.io/github/issues-raw/fractalbrew/vscode-mozillacpp/blocking.svg?style=popout)](https://github.com/FractalBrew/vscode-mozillacpp/issues?q=is%3Aopen+is%3Aissue+label%3Ablocking)
+[![Open issues](https://img.shields.io/github/issues-raw/fractalbrew/vscode-mozillacpp.svg?style=popout)](https://github.com/FractalBrew/vscode-mozillacpp/issues)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr-raw/fractalbrew/vscode-mozillacpp.svg?style=popout)](https://github.com/FractalBrew/vscode-mozillacpp/pulls)
+
 With generated headers, external build directories and a non-standard build
 configuration it is near impossible for standard tools to understand Mozilla's build graph.
 

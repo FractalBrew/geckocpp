@@ -4,13 +4,13 @@
 
 import * as vscode from 'vscode';
 
-import { WorkspaceFolder } from './folders';
+import { SourceFolder } from './folders';
 import { MachConfigurationProvider } from './provider';
 import { log } from './logging';
 
 export class Workspace {
   machCount: number = 0;
-  folders: Map<vscode.Uri, Promise<WorkspaceFolder>>;
+  folders: Map<vscode.Uri, Promise<SourceFolder>>;
   provider: MachConfigurationProvider|null = null;
 
   public constructor() {
@@ -31,9 +31,9 @@ export class Workspace {
   }
 
   private async addFolder(wFolder: vscode.WorkspaceFolder): Promise<void> {
-    let promise: Promise<WorkspaceFolder> = WorkspaceFolder.create(this, wFolder);
+    let promise: Promise<SourceFolder> = SourceFolder.create(this, wFolder);
     this.folders.set(wFolder.uri, promise);
-    let folder: WorkspaceFolder = await promise;
+    let folder: SourceFolder = await promise;
 
     if (folder.hasMach()) {
       this.machCount++;
@@ -48,14 +48,14 @@ export class Workspace {
   }
 
   private async removeFolder(wFolder: vscode.WorkspaceFolder): Promise<void> {
-    let promise: Promise<WorkspaceFolder>|undefined = this.folders.get(wFolder.uri);
+    let promise: Promise<SourceFolder>|undefined = this.folders.get(wFolder.uri);
     if (!promise) {
       log.warn('Attempted to remove an unknown workspace folder.');
       return;
     }
 
     this.folders.delete(wFolder.uri);
-    let folder: WorkspaceFolder = await promise;
+    let folder: SourceFolder = await promise;
     if (folder.hasMach()) {
       this.machCount--;
 
@@ -69,7 +69,7 @@ export class Workspace {
     event.removed.map((f) => this.removeFolder(f));
   }
 
-  public async getFolder(uri: vscode.Uri): Promise<WorkspaceFolder|undefined> {
+  public async getFolder(uri: vscode.Uri): Promise<SourceFolder|undefined> {
     let wFolder: vscode.WorkspaceFolder|undefined = vscode.workspace.getWorkspaceFolder(uri);
     if (wFolder) {
       return this.folders.get(wFolder.uri);
@@ -77,7 +77,7 @@ export class Workspace {
     return undefined;
   }
 
-  public async getMachFolders(): Promise<WorkspaceFolder[]> {
+  public async getMachFolders(): Promise<SourceFolder[]> {
     return (await Promise.all(this.folders.values())).filter((f) => f.hasMach());
   }
 

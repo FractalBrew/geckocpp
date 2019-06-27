@@ -1,5 +1,5 @@
 {
-  "name": "mozillscpp",
+  "name": "mozillacpp",
   "displayName": "Mozilla C++ Intellisense Provider",
   "description": "A C++ intellisense provider for the Mozilla source code.",
   "version": "0.1.0",
@@ -30,6 +30,19 @@
     "mach"
   ],
   "icon": "icon.png",
+  "badges": [{
+    "url": "https://img.shields.io/github/issues-raw/fractalbrew/vscode-mozillacpp.svg?style=popout",
+    "href": "https://github.com/FractalBrew/vscode-mozillacpp/issues",
+    "description": "Open issues"
+  }, {
+    "url": "https://img.shields.io/github/issues-raw/fractalbrew/vscode-mozillacpp/blocking.svg?style=popout",
+    "href": "https://github.com/FractalBrew/vscode-mozillacpp/issues?q=is%3Aopen+is%3Aissue+label%3Ablocking",
+    "description": "Blocking issues"
+  }, {
+    "url": "https://img.shields.io/github/issues-pr-raw/fractalbrew/vscode-mozillacpp.svg?style=popout",
+    "href": "https://github.com/FractalBrew/vscode-mozillacpp/pulls",
+    "description": "Open pull requests"
+  }],
   "extensionDependency": [
     "vscode.cpptools"
   ],
@@ -50,29 +63,29 @@
       "type": "object",
       "title": "Mozilla Intellisense",
       "properties": {
-        "mozillacpp.compiler.cpp": {
+        "mozillacpp.cpp.compiler": {
           "type": "string",
           "default": "",
           "description": "Override the automatically detected compiler for cpp files.",
-          "scope": "window"
+          "scope": "resource"
         },
-        "mozillacpp.compiler.c": {
+        "mozillacpp.c.compiler": {
           "type": "string",
           "default": "",
           "description": "Override the automatically detected compiler for c files.",
-          "scope": "window"
+          "scope": "resource"
         },
-        "mozillacpp.mach": {
+        "mozillacpp.mach.path": {
           "type": "string",
           "default": "",
           "description": "The path to a custom mach to use.",
-          "scope": "window"
+          "scope": "resource"
         },
-        "mozillacpp.mach_env": {
+        "mozillacpp.mach.environment": {
           "type": "object",
           "default": {},
-          "description": "Environment variables to set before running mach.",
-          "scope": "window"
+          "description": "Environment variables to set before running mach. Will be merged with vscode's environment",
+          "scope": "resource"
         },
         "mozillacpp.tag.disable": {
           "type": "boolean",
@@ -80,31 +93,31 @@
           "description": "Disables the C++ tag parser.",
           "scope": "window"
         },
-        "mozillacpp.log_level": {
+        "mozillacpp.log.level": {
           "type": "string",
           "enum": [
-            "never",
+            "always",
             "debug",
             "log",
             "warn",
             "error",
-            "none"
+            "never"
           ],
           "default": "warn",
           "description": "The level of logging shown in the Output window.",
           "scope": "window"
         },
-        "mozillacpp.log_show_level": {
+        "mozillacpp.log.show_level": {
           "type": "string",
           "enum": [
-            "never",
+            "always",
             "debug",
             "log",
             "warn",
             "error",
-            "none"
+            "never"
           ],
-          "default": "none",
+          "default": "never",
           "description": "A log of this level will cause the Output channel to open automatically.",
           "scope": "window"
         }

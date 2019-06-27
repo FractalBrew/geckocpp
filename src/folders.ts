@@ -12,6 +12,7 @@ import * as cpptools from 'vscode-cpptools';
 import { Workspace } from './workspace';
 import { log } from './logging';
 import { VERSIONS, splitCmdLine, parseCompilerDefaults, CPP_VERSION, CPP_STANDARD, C_VERSION, C_STANDARD, CompilerInfo } from './shared';
+import { config } from './config';
 
 function fsStat(path: string): Promise<fs.Stats> {
   return new Promise((resolve, reject) => {
@@ -77,17 +78,13 @@ function exec(command: string, args: string[], options?: SpawnOptions): Promise<
   });
 }
 
-function mach(machPath: string, args: string[]): Promise<ProcessResult> {
-  let config: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration('mozillacpp');
-
+function mach(uri: vscode.Uri, machPath: string, args: string[]): Promise<ProcessResult> {
   let cwd: string = path.dirname(machPath);
-  let command: string = config.get('mach') || machPath;
-
-  let env: NodeJS.ProcessEnv = Object.assign({}, config.get('mach_env') || {}, process.env);
+  let command: string = config.getMach(uri) || machPath;
 
   return exec(command, args, {
     cwd,
-    env,
+    env: config.getMachEnvironment(uri),
     shell: false,
     windowsHide: true,
   });
@@ -100,16 +97,20 @@ interface EnvironmentInfo {
   macFramework?: string;
 }
 
-export class WorkspaceFolder {
+export class SourceFolder {
   private workspace: Workspace;
   private folder: vscode.WorkspaceFolder;
   private environmentInfo: EnvironmentInfo|undefined;
 
+  public get root(): vscode.Uri {
+    return this.folder.uri;
+  }
+
   private static async fetchEnvironmentInfo(uri: vscode.Uri): Promise<EnvironmentInfo|undefined> {
     let environment: EnvironmentInfo = {
       compilers: [],
-      topobjdir: "",
-      mach: "",
+      topobjdir: '',
+      mach: '',
     };
 
     // Are we even a mozilla source tree?
@@ -130,7 +131,7 @@ export class WorkspaceFolder {
 
     // Find some basic configuration information.
     try {
-      let env: any = JSON.parse((await mach(environment.mach, ['environment', '--format', 'json'])).stdout);
+      let env: any = JSON.parse((await mach(uri, environment.mach, ['environment', '--format', 'json'])).stdout);
       environment.topobjdir = env.topobjdir;
 
       for (let arg of env.mozconfig.configure_args) {
@@ -144,13 +145,12 @@ export class WorkspaceFolder {
     }
 
     // Figure out the compilers to use.
-    let config: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration('mozillacpp.compiler');
     for (let extension of ['c', 'cpp']) {
-      let compiler: string|undefined = config.get('extension');
+      let compiler: string|undefined = config.getCompiler(uri, extension);
       if (!compiler) {
         try {
           let testFile: string = path.join(uri.fsPath, `test.${extension}`);
-          let output: ProcessResult = await mach(environment.mach, ['compileflags', testFile]);
+          let output: ProcessResult = await mach(uri, environment.mach, ['compileflags', testFile]);
 
           let args: string[] = splitCmdLine(output.stdout);
           if (args.length > 0) {
@@ -220,8 +220,8 @@ export class WorkspaceFolder {
     return environment;
   }
 
-  public static async create(workspace: Workspace, folder: vscode.WorkspaceFolder): Promise<WorkspaceFolder> {
-    return new WorkspaceFolder(workspace, folder, await WorkspaceFolder.fetchEnvironmentInfo(folder.uri));
+  public static async create(workspace: Workspace, folder: vscode.WorkspaceFolder): Promise<SourceFolder> {
+    return new SourceFolder(workspace, folder, await SourceFolder.fetchEnvironmentInfo(folder.uri));
   }
 
   private constructor(workspace: Workspace, folder: vscode.WorkspaceFolder, environmentInfo: EnvironmentInfo|undefined) {
@@ -235,7 +235,7 @@ export class WorkspaceFolder {
       throw new Error(`Mach does not exist for the folder ${this.folder.uri}`);
     }
 
-    return mach(this.environmentInfo.mach, args);
+    return mach(this.root, this.environmentInfo.mach, args);
   }
 
   public hasMach(): boolean {
@@ -272,7 +272,7 @@ export class WorkspaceFolder {
     return this.hasMach();
   }
 
-  public getCachedConfiguration(uri: vscode.Uri, getConfig: (folder: WorkspaceFolder, compilerInfo: CompilerInfo, path: string) => Promise<cpptools.SourceFileConfiguration|undefined>): Promise<cpptools.SourceFileConfiguration|undefined> {
+  public getCachedConfiguration(uri: vscode.Uri, getConfig: (folder: SourceFolder, compilerInfo: CompilerInfo, path: string) => Promise<cpptools.SourceFileConfiguration|undefined>): Promise<cpptools.SourceFileConfiguration|undefined> {
     if (!this.environmentInfo) {
       return Promise.resolve(undefined);
     }

@@ -5,10 +5,11 @@
 import * as cpptools from 'vscode-cpptools';
 import * as vscode from 'vscode';
 
-import { WorkspaceFolder, ProcessResult } from './folders';
+import { SourceFolder, ProcessResult } from './folders';
 import { Workspace } from './workspace';
 import { log } from './logging';
 import { parseConfigFromCmdLine, CompilerInfo } from './shared';
+import { config } from './config';
 
 export class MachConfigurationProvider implements cpptools.CustomConfigurationProvider {
   api: cpptools.CppToolsApi;
@@ -58,7 +59,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
 
   async canProvideConfiguration(uri: vscode.Uri): Promise<boolean> {
     try {
-      let folder: WorkspaceFolder|undefined = await this.workspace.getFolder(uri);
+      let folder: SourceFolder|undefined = await this.workspace.getFolder(uri);
       return folder !== undefined && folder.canProvideConfig();
     } catch (e) {
       log.error('Failed to canProvildeConfiguration.', e);
@@ -66,7 +67,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
     }
   }
 
-  private async getConfiguration(folder: WorkspaceFolder, compilerInfo: CompilerInfo, path: string): Promise<cpptools.SourceFileConfiguration|undefined> {
+  private async getConfiguration(folder: SourceFolder, compilerInfo: CompilerInfo, path: string): Promise<cpptools.SourceFileConfiguration|undefined> {
     try {
       let output: ProcessResult = await folder.mach(['compileflags', path]);
       try {
@@ -86,7 +87,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
   public async provideConfigurations(uris: vscode.Uri[]): Promise<cpptools.SourceFileConfigurationItem[]> {
     let results: (undefined|cpptools.SourceFileConfigurationItem)[] = await Promise.all(uris.map(async (uri) => {
       try {
-        let folder: WorkspaceFolder|undefined = await this.workspace.getFolder(uri);
+        let folder: SourceFolder|undefined = await this.workspace.getFolder(uri);
         if (!folder || !await folder.canProvideConfig()) {
           return undefined;
         }
@@ -127,8 +128,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
   }
 
   public async provideBrowseConfiguration(): Promise<cpptools.WorkspaceBrowseConfiguration> {
-    let config: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration('mozillacpp');
-    if (config.get('tag.disable')) {
+    if (config.isTagParsingDisable()) {
       log.debug('Disabling browse path.');
       return {
         browsePath: [],
@@ -136,7 +136,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
     }
 
     try {
-      let folders: WorkspaceFolder[] = await this.workspace.getMachFolders();
+      let folders: SourceFolder[] = await this.workspace.getMachFolders();
 
       let browsePath: Set<string> = new Set();
 

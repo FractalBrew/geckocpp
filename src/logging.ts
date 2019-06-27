@@ -4,28 +4,7 @@
 
 import * as vscode from 'vscode';
 
-enum Level {
-  Never = 0,
-  Debug,
-  Log,
-  Warn,
-  Error,
-}
-
-function levelFromStr(name: string): Level {
-  switch (name.toLocaleLowerCase()) {
-    case 'debug':
-      return Level.Debug;
-    case 'log':
-      return Level.Log;
-    case 'warn':
-      return Level.Warn;
-    case 'error':
-      return Level.Error;
-    default:
-      return Level.Never;
-  }
-}
+import { Level, config } from './config';
 
 function serialize(value: any): string {
   if (value === null) {
@@ -66,35 +45,21 @@ function serialize(value: any): string {
 
 class Logger {
   channel: vscode.OutputChannel;
-  logLevel: Level = Level.Warn;
-  showLevel: Level = Level.Never;
 
   constructor(name: string) {
     this.channel = vscode.window.createOutputChannel(name);
-
-    this.updateConfig();
-    vscode.workspace.onDidChangeConfiguration(() => this.updateConfig());
-  }
-
-  updateConfig(): void {
-    let config: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration('mozillacpp');
-    this.logLevel = levelFromStr(config.get('log_level', 'warn'));
-    this.showLevel = levelFromStr(config.get('log_show_level', 'never'));
   }
 
   shouldOpen(level: Level): boolean {
-    return level >= this.showLevel;
+    return level >= config.getLogLevel();
   }
 
   shouldOutput(level: Level): boolean {
-    return level >= this.logLevel;
+    return level >= config.getLogShowLevel();
   }
 
   output(level: Level, ...args: any[]): void {
     switch (level) {
-      case Level.Debug:
-        console.debug('mozillacpp:', ...args);
-        break;
       case Level.Warn:
         console.warn('mozillacpp:', ...args);
         break;
@@ -134,4 +99,4 @@ class Logger {
   }
 }
 
-export let log: Logger = new Logger("Mozilla Intellisense");
+export let log: Logger = new Logger('Mozilla Intellisense');

@@ -9,7 +9,7 @@ let split: (str: string, options: Options) => string[] = require('split-string')
 
 import { log } from './logging';
 
-export type VERSIONS = "c89" | "c99" | "c11" | "c++98" | "c++03" | "c++11" | "c++14" | "c++17";
+export type VERSIONS = 'c89' | 'c99' | 'c11' | 'c++98' | 'c++03' | 'c++11' | 'c++14' | 'c++17';
 
 export const CPP_STANDARD: VERSIONS = 'c++14';
 export const CPP_VERSION: string = CPP_STANDARD;
