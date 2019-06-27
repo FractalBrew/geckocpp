@@ -11,7 +11,7 @@ import * as cpptools from 'vscode-cpptools';
 
 import { Workspace } from './workspace';
 import { log } from './logging';
-import { splitCmdLine, parseCompilerDefaults, CPP_VERSION, C_VERSION, CompilerInfo } from './shared';
+import { VERSIONS, splitCmdLine, parseCompilerDefaults, CPP_VERSION, CPP_STANDARD, C_VERSION, C_STANDARD, CompilerInfo } from './shared';
 
 function fsStat(path: string): Promise<fs.Stats> {
   return new Promise((resolve, reject) => {
@@ -166,24 +166,33 @@ export class WorkspaceFolder {
       }
       log.debug(`Using '${compiler}' for ${extension} defaults.`);
 
-      let info: CompilerInfo = {
-        compiler,
-        extension,
-        frameworkIncludes: new Set(),
-        includes: new Set(),
-        defines: new Set(),
-      };
-
       // Find the compiler's default preprocessor directives.
       let args: string[] = [];
+      let standard: VERSIONS|undefined;
       switch (extension) {
         case 'c':
           args.push(`-std=${C_VERSION}`, '-xc');
+          standard = C_STANDARD;
           break;
         case 'cpp':
           args.push(`-std=${CPP_VERSION}`, '-xc++');
+          standard = CPP_STANDARD;
           break;
       }
+
+      if (!standard) {
+        log.error(`Attempting to find compiler for unexpected extension ${extension}`);
+        continue;
+      }
+
+      let info: CompilerInfo = {
+        compiler,
+        extension,
+        standard,
+        frameworkIncludes: new Set(),
+        includes: new Set(),
+        defines: new Map(),
+      };
 
       if (environment.macFramework) {
         args.push('-isysroot');

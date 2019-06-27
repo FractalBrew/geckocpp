@@ -9,17 +9,27 @@ let split: (str: string, options: Options) => string[] = require('split-string')
 
 import { log } from './logging';
 
-export const CPP_VERSION: string = 'c++14';
+export type VERSIONS = "c89" | "c99" | "c11" | "c++98" | "c++03" | "c++11" | "c++14" | "c++17";
+
+export const CPP_STANDARD: VERSIONS = 'c++14';
+export const CPP_VERSION: string = CPP_STANDARD;
+export const C_STANDARD: VERSIONS = 'c99';
 export const C_VERSION: string = 'gnu99';
 
 const FRAMEWORK_MARKER: string = ' (framework directory)';
 
+interface Define {
+  key: string;
+  value?: string;
+}
+
 export interface CompilerInfo {
   compiler: string;
   extension: string;
+  standard: VERSIONS;
   frameworkIncludes: Set<string>;
   includes: Set<string>;
-  defines: Set<string>;
+  defines: Map<string, Define>;
 }
 
 export function splitCmdLine(cmdline: string): string[] {
@@ -40,11 +50,33 @@ export function splitCmdLine(cmdline: string): string[] {
   });
 }
 
+function buildDefine(text: string, splitter: string): Define {
+  let pos: number = text.indexOf(splitter);
+  if (pos >= 0) {
+    return {
+      key: text.substring(0, pos),
+      value: text.substring(pos + 1),
+    };
+  }
+
+  return {
+    key: text,
+  };
+}
+
+function outputDefine(define: Define): string {
+  if (define.value) {
+    return `${define.key} ${define.value}`;
+  }
+
+  return define.key;
+}
+
 export function parseConfigFromCmdLine(compilerInfo: CompilerInfo, cmdline: string): cpptools.SourceFileConfiguration {
   let args: string[] = splitCmdLine(cmdline);
 
   let includePath: Set<string> = new Set(compilerInfo.includes);
-  let defines: Set<string> = new Set(compilerInfo.defines);
+  let defines: Map<string, Define> = new Map(compilerInfo.defines);
   let forcedInclude: Set<string> = new Set();
 
   for (let path of compilerInfo.frameworkIncludes) {
@@ -60,7 +92,8 @@ export function parseConfigFromCmdLine(compilerInfo: CompilerInfo, cmdline: stri
 
     switch (arg.charAt(1)) {
       case 'D':
-        defines.add(arg.substring(2));
+        let define: Define = buildDefine(arg.substring(2), '=');
+        defines.set(define.key, define);
         continue;
       case 'I':
         includePath.add(arg.substring(2));
@@ -80,11 +113,11 @@ export function parseConfigFromCmdLine(compilerInfo: CompilerInfo, cmdline: stri
     }
   }
 
-  let config: any = {
+  let config: cpptools.SourceFileConfiguration = {
     includePath: Array.from(includePath),
-    defines: Array.from(defines),
+    defines: Array.from(defines.values()).map(outputDefine),
     intelliSenseMode: 'clang-x64',
-    standard: CPP_VERSION,
+    standard: compilerInfo.standard,
     forcedInclude: Array.from(forcedInclude),
   };
 
@@ -113,12 +146,8 @@ export function parseCompilerDefaults(info: CompilerInfo, output: string): void 
     if (line.startsWith('#include ')) {
       inIncludes = true;
     } else if (line.startsWith('#define ')) {
-      let define: string = line.substring(8).trim();
-      let pos: number = define.indexOf(" ");
-      if (pos > 0) {
-        define = `${define.substring(0, pos)}=${define.substring(pos).trim()}`;
-      }
-      info.defines.add(define);
+      let define: Define = buildDefine(line.substring(8).trim(), ' ');
+      info.defines.set(define.key, define);
     }
   }
 }
