@@ -22,9 +22,9 @@ identify both cases and warn you accordingly.
 
 ## Configuration
 
-* `mozillacpp.compiler` overrides the detected compiler.
+* `mozillacpp.compiler.c` and `mozillacpp.compiler.cpp` overrides the detected compiler for each language.
 * `mozillacpp.mach` overrides the detected `mach`, useful for supplying a script to configure your build.
 * `mozillacpp.mach_env` sets environment variables to use when running `mach`. These are merged with the existing process environment.
 * `mozillacpp.log_level` sets the log level that will show up in the Output panel.
 * `mozillacpp.log_show_level` sets a log level that will cause the Output panel to appear.
-* `mozillacpp.tag.disable`: disables the C++ tag parser. The tag parser chews up a lot of CPU cycles and provides less accurate results, but it is more reliable than intellisense so will give results when that fails.
+* `mozillacpp.tag.disable` disables the C++ tag parser. The tag parser chews up a lot of CPU cycles and provides less accurate results, but it is more reliable than intellisense so will give results when that fails.
