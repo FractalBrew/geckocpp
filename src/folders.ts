@@ -208,6 +208,14 @@ export class SourceFolder {
 
         parseCompilerDefaults(info, result.stdout);
         parseCompilerDefaults(info, result.stderr);
+
+        if (info.defines.size == 0 || info.includes.size == 0) {
+          log.error(`Failed to discover any default includes or defines from ${compiler}`);
+          log.debug('stdout:', result.stdout);
+          log.debug('stderr:', result.stderr);
+          return undefined;
+        }
+
         log.debug(`Discovered ${info.includes.size} includes and ${info.defines.size} defines.`);
       } catch (e) {
         log.error(`Failed to discover the compiler defaults for ${extension} files.`, e);
