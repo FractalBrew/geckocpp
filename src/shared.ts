@@ -20,7 +20,7 @@ const FRAMEWORK_MARKER: string = ' (framework directory)';
 
 interface Define {
   key: string;
-  value?: string;
+  value: string;
 }
 
 export interface CompilerInfo {
@@ -61,15 +61,12 @@ function buildDefine(text: string, splitter: string): Define {
 
   return {
     key: text,
+    value: '1',
   };
 }
 
 function outputDefine(define: Define): string {
-  if (define.value) {
-    return `${define.key} ${define.value}`;
-  }
-
-  return define.key;
+  return `${define.key}=${define.value}`;
 }
 
 export function parseConfigFromCmdLine(compilerInfo: CompilerInfo, cmdline: string): cpptools.SourceFileConfiguration {
