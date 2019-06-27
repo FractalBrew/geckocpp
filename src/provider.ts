@@ -1,10 +1,14 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
 import * as cpptools from 'vscode-cpptools';
 import * as vscode from 'vscode';
 
-import { WorkspaceFolder } from './folders';
+import { WorkspaceFolder, ProcessResult } from './folders';
 import { Workspace } from './workspace';
 import { log } from './logging';
-import { splitCmdLine, parseConfigFromCmdLine, CompilerInfo } from './shared';
+import { parseConfigFromCmdLine, CompilerInfo } from './shared';
 
 export class MachConfigurationProvider implements cpptools.CustomConfigurationProvider {
   api: cpptools.CppToolsApi;
@@ -14,7 +18,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
   extensionId: string = 'fractalbrew.mozillacpp';
 
   public static async create(workspace: Workspace): Promise<MachConfigurationProvider|null> {
-    let api = await cpptools.getCppToolsApi(cpptools.Version.v2);
+    let api: cpptools.CppToolsApi|undefined = await cpptools.getCppToolsApi(cpptools.Version.v2);
     if (api) {
       return new MachConfigurationProvider(api, workspace);
     }
@@ -40,21 +44,21 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
     }
   }
 
-  private showError(message: string) {
+  private showError(message: string): void {
     vscode.window.showErrorMessage(message);
   }
 
-  public resetConfiguration() {
+  public resetConfiguration(): void {
     this.api.didChangeCustomConfiguration(this);
   }
 
-  public resetBrowseConfiguration() {
+  public resetBrowseConfiguration(): void {
     this.api.didChangeCustomBrowseConfiguration(this);
   }
 
   async canProvideConfiguration(uri: vscode.Uri): Promise<boolean> {
     try {
-      let folder = await this.workspace.getFolder(uri);
+      let folder: WorkspaceFolder|undefined = await this.workspace.getFolder(uri);
       return folder !== undefined && folder.canProvideConfig();
     } catch (e) {
       log.error('Failed to canProvildeConfiguration.', e);
@@ -64,7 +68,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
 
   private async getConfiguration(folder: WorkspaceFolder, compilerInfo: CompilerInfo, path: string): Promise<cpptools.SourceFileConfiguration|undefined> {
     try {
-      let output = await folder.mach(['compileflags', path]);
+      let output: ProcessResult = await folder.mach(['compileflags', path]);
       try {
         return parseConfigFromCmdLine(compilerInfo, output.stdout);
       } catch (e) {
@@ -82,12 +86,12 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
   public async provideConfigurations(uris: vscode.Uri[]): Promise<cpptools.SourceFileConfigurationItem[]> {
     let results: (undefined|cpptools.SourceFileConfigurationItem)[] = await Promise.all(uris.map(async (uri) => {
       try {
-        let folder = await this.workspace.getFolder(uri);
+        let folder: WorkspaceFolder|undefined = await this.workspace.getFolder(uri);
         if (!folder || !await folder.canProvideConfig()) {
           return undefined;
         }
 
-        let config = await folder.getCachedConfiguration(uri, this.getConfiguration.bind(this));
+        let config: cpptools.SourceFileConfiguration|undefined = await folder.getCachedConfiguration(uri, this.getConfiguration.bind(this));
 
         if (config === undefined) {
           log.debug(`Unable to find configuration for ${uri.fsPath}.`);
@@ -106,9 +110,9 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
       }
     }));
 
-    let hasConfig = (item: cpptools.SourceFileConfigurationItem|undefined): item is cpptools.SourceFileConfigurationItem => {
+    function hasConfig(item: cpptools.SourceFileConfigurationItem|undefined): item is cpptools.SourceFileConfigurationItem {
       return item !== undefined;
-    };
+    }
 
     return results.filter(hasConfig);
   }
@@ -124,7 +128,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
 
   public async provideBrowseConfiguration(): Promise<cpptools.WorkspaceBrowseConfiguration> {
     try {
-      let folders = await this.workspace.getMachFolders();
+      let folders: WorkspaceFolder[] = await this.workspace.getMachFolders();
 
       let browsePath: Set<string> = new Set();
 
@@ -137,7 +141,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
         browsePath.add(folder.getTopObjDir());
       }
 
-      let config = {
+      let config: cpptools.WorkspaceBrowseConfiguration = {
         browsePath: Array.from(browsePath),
       };
 
@@ -149,7 +153,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
     }
   }
 
-  public dispose() {
+  public dispose(): void {
     this.api.dispose();
   }
 }

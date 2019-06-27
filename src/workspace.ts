@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
 import * as vscode from 'vscode';
 
 import { WorkspaceFolder } from './folders';
@@ -12,7 +16,7 @@ export class Workspace {
   public constructor() {
     this.folders = new Map();
 
-    let folders = vscode.workspace.workspaceFolders;
+    let folders: vscode.WorkspaceFolder[]|undefined = vscode.workspace.workspaceFolders;
     if (folders) {
       folders.map((f) => this.addFolder(f));
     }
@@ -20,16 +24,16 @@ export class Workspace {
     vscode.workspace.onDidChangeWorkspaceFolders(() => this.workspaceChanged);
   }
 
-  public dispose() {
+  public dispose(): void {
     if (this.provider) {
       this.provider.dispose();
     }
   }
 
-  private async addFolder(wFolder: vscode.WorkspaceFolder) {
-    let promise = WorkspaceFolder.create(this, wFolder);
+  private async addFolder(wFolder: vscode.WorkspaceFolder): Promise<void> {
+    let promise: Promise<WorkspaceFolder> = WorkspaceFolder.create(this, wFolder);
     this.folders.set(wFolder.uri, promise);
-    let folder = await promise;
+    let folder: WorkspaceFolder = await promise;
 
     if (folder.hasMach()) {
       this.machCount++;
@@ -43,15 +47,15 @@ export class Workspace {
     }
   }
 
-  private async removeFolder(wFolder: vscode.WorkspaceFolder) {
-    let promise = this.folders.get(wFolder.uri);
+  private async removeFolder(wFolder: vscode.WorkspaceFolder): Promise<void> {
+    let promise: Promise<WorkspaceFolder>|undefined = this.folders.get(wFolder.uri);
     if (!promise) {
       log.warn('Attempted to remove an unknown workspace folder.');
       return;
     }
 
     this.folders.delete(wFolder.uri);
-    let folder = await promise;
+    let folder: WorkspaceFolder = await promise;
     if (folder.hasMach()) {
       this.machCount--;
 
@@ -60,13 +64,13 @@ export class Workspace {
     }
   }
 
-  private workspaceChanged(event: vscode.WorkspaceFoldersChangeEvent) {
+  private workspaceChanged(event: vscode.WorkspaceFoldersChangeEvent): void {
     event.added.map((f) => this.addFolder(f));
     event.removed.map((f) => this.removeFolder(f));
   }
 
   public async getFolder(uri: vscode.Uri): Promise<WorkspaceFolder|undefined> {
-    let wFolder = vscode.workspace.getWorkspaceFolder(uri);
+    let wFolder: vscode.WorkspaceFolder|undefined = vscode.workspace.getWorkspaceFolder(uri);
     if (wFolder) {
       return this.folders.get(wFolder.uri);
     }
@@ -81,17 +85,17 @@ export class Workspace {
     return this.machCount > 0;
   }
 
-  public resetConfiguration() {
+  public resetConfiguration(): void {
     if (this.provider) {
       this.provider.resetConfiguration();
     }
   }
 
-  public resetBrowseConfiguration() {
+  public resetBrowseConfiguration(): void {
     if (this.provider) {
       this.provider.resetBrowseConfiguration();
     }
   }
 }
 
-export const gWorkspace = new Workspace();
+export let gWorkspace: Workspace = new Workspace();

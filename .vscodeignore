@@ -1,5 +1,5 @@
 .vscode/**
 .gitignore
-jsconfig.json
-.eslintrc.json
+tsconfig.json
+tslint.json
 images

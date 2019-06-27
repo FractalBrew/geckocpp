@@ -3,7 +3,14 @@
   "displayName": "Mozilla C++ Intellisense Provider",
   "description": "A C++ intellisense provider for the Mozilla source code.",
   "version": "0.1.0",
+  "preview": true,
   "publisher": "fractalbrew",
+  "author": {
+    "name": "Dave Townsend",
+    "email": "dtownsend@oxymoronical.com",
+    "url": "https://www.oxymoronical.com"
+  },
+  "license": "MPL-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/FractalBrew/vscode-mozillacpp.git"
@@ -69,14 +76,28 @@
         },
         "mozillacpp.log_level": {
           "type": "string",
-          "enum": ["never", "debug", "log", "warn", "error", "none"],
+          "enum": [
+            "never",
+            "debug",
+            "log",
+            "warn",
+            "error",
+            "none"
+          ],
           "default": "warn",
           "description": "The level of logging shown in the Output window.",
           "scope": "window"
         },
         "mozillacpp.log_show_level": {
           "type": "string",
-          "enum": ["never", "debug", "log", "warn", "error", "none"],
+          "enum": [
+            "never",
+            "debug",
+            "log",
+            "warn",
+            "error",
+            "none"
+          ],
           "default": "none",
           "description": "A log of this level will cause the Output channel to open automatically.",
           "scope": "window"
@@ -98,6 +119,8 @@
     "typescript": "^3.3.1",
     "vscode": "^1.1.28",
     "tslint": "^5.12.1",
+    "vrsource-tslint-rules": "^6.0.0",
+    "tslint-microsoft-contrib": "^6.2.0",
     "@types/node": "^10.12.21",
     "@types/mocha": "^2.2.42",
     "vscode-cpptools": "^2.1.2",

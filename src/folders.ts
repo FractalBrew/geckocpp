@@ -1,6 +1,10 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
 import * as path from 'path';
 import * as fs from 'fs';
-import { spawn, SpawnOptions } from 'child_process';
+import { spawn, SpawnOptions, ChildProcess } from 'child_process';
 
 import * as vscode from 'vscode';
 import * as cpptools from 'vscode-cpptools';
@@ -21,7 +25,7 @@ function fsStat(path: string): Promise<fs.Stats> {
   });
 }
 
-interface ProcessResult {
+export interface ProcessResult {
   code: number;
   stdout: string;
   stderr: string;
@@ -44,7 +48,7 @@ class ProcessError extends Error {
 function exec(command: string, args: string[], options?: SpawnOptions): Promise<ProcessResult> {
   log.debug(`Executing '${command} ${args.join(' ')}'`);
   return new Promise((resolve, reject) => {
-    let process = spawn(command, args, options);
+    let process: ChildProcess = spawn(command, args, options);
 
     let output: ProcessResult = {
       code: 0,
@@ -74,12 +78,12 @@ function exec(command: string, args: string[], options?: SpawnOptions): Promise<
 }
 
 function mach(machPath: string, args: string[]): Promise<ProcessResult> {
-  let config = vscode.workspace.getConfiguration('mozillacpp');
+  let config: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration('mozillacpp');
 
-  let cwd = path.dirname(machPath);
+  let cwd: string = path.dirname(machPath);
   let command: string = config.get('mach') || machPath;
 
-  let env = Object.assign({}, config.get('mach_env') || {}, process.env);
+  let env: NodeJS.ProcessEnv = Object.assign({}, config.get('mach_env') || {}, process.env);
 
   return exec(command, args, {
     cwd,
@@ -110,9 +114,9 @@ export class WorkspaceFolder {
 
     // Are we even a mozilla source tree?
     if (uri.scheme === 'file') {
-      let check = path.join(uri.fsPath, 'mach');
+      let check: string = path.join(uri.fsPath, 'mach');
       try {
-        let stats = await fsStat(check);
+        let stats: fs.Stats = await fsStat(check);
         if (stats.isFile()) {
           environment.mach = check;
         } else {
@@ -126,7 +130,7 @@ export class WorkspaceFolder {
 
     // Find some basic configuration information.
     try {
-      let env = JSON.parse((await mach(environment.mach, ['environment', '--format', 'json'])).stdout);
+      let env: any = JSON.parse((await mach(environment.mach, ['environment', '--format', 'json'])).stdout);
       environment.topobjdir = env.topobjdir;
 
       for (let arg of env.mozconfig.configure_args) {
@@ -140,15 +144,15 @@ export class WorkspaceFolder {
     }
 
     // Figure out the compilers to use.
-    let config = vscode.workspace.getConfiguration('mozillacpp.compiler');
+    let config: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration('mozillacpp.compiler');
     for (let extension of ['c', 'cpp']) {
       let compiler: string|undefined = config.get('extension');
       if (!compiler) {
         try {
-          let testFile = path.join(uri.fsPath, `test.${extension}`);
-          let output = await mach(environment.mach, ['compileflags', testFile]);
+          let testFile: string = path.join(uri.fsPath, `test.${extension}`);
+          let output: ProcessResult = await mach(environment.mach, ['compileflags', testFile]);
 
-          let args = splitCmdLine(output.stdout);
+          let args: string[] = splitCmdLine(output.stdout);
           if (args.length > 0) {
             compiler = args[0];
           } else {
@@ -188,7 +192,7 @@ export class WorkspaceFolder {
 
       args.push('-Wp,-v', '-E', '-dD', '/dev/null');
       try {
-        let result = await exec(compiler, args, {
+        let result: ProcessResult = await exec(compiler, args, {
           shell: false,
           windowsHide: true,
         });
@@ -264,8 +268,8 @@ export class WorkspaceFolder {
       return Promise.resolve(undefined);
     }
 
-    let file = uri.fsPath;
-    let extension = path.extname(file);
+    let file: string = uri.fsPath;
+    let extension: string = path.extname(file);
     if (extension.length > 0) {
       extension = extension.substring(1);
       if (extension === 'h') {

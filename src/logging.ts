@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
 import * as vscode from 'vscode';
 
 enum Level {
@@ -43,12 +47,12 @@ function serialize(value: any): string {
     case 'symbol':
       return String(value);
     case 'function':
-      let args = '';
+      let args: string = '';
 
       if (value.length > 0) {
-        let ch = 'a';
+        let ch: string = 'a';
         args = ch;
-        for (let i = 1; i < value.length; i++) {
+        for (let i: number = 1; i < value.length; i++) {
           ch = String.fromCharCode(ch.charCodeAt(0) + 1);
           args += `, ${ch}`;
         }
@@ -72,8 +76,8 @@ class Logger {
     vscode.workspace.onDidChangeConfiguration(() => this.updateConfig());
   }
 
-  updateConfig() {
-    let config = vscode.workspace.getConfiguration('mozillacpp');
+  updateConfig(): void {
+    let config: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration('mozillacpp');
     this.logLevel = levelFromStr(config.get('log_level', 'warn'));
     this.showLevel = levelFromStr(config.get('log_show_level', 'never'));
   }
@@ -86,7 +90,7 @@ class Logger {
     return level >= this.logLevel;
   }
 
-  output(level: Level, ...args: any[]) {
+  output(level: Level, ...args: any[]): void {
     switch (level) {
       case Level.Debug:
         console.debug('mozillacpp:', ...args);
@@ -113,21 +117,21 @@ class Logger {
     }
   }
 
-  debug(...args: any[]) {
+  debug(...args: any[]): void {
     this.output(Level.Debug, ...args);
   }
 
-  log(...args: any[]) {
+  log(...args: any[]): void {
     this.output(Level.Log, ...args);
   }
 
-  warn(...args: any[]) {
+  warn(...args: any[]): void {
     this.output(Level.Warn, ...args);
   }
 
-  error(...args: any[]) {
+  error(...args: any[]): void {
     this.output(Level.Error, ...args);
   }
 }
 
-export let log = new Logger("Mozilla Intellisense");
+export let log: Logger = new Logger("Mozilla Intellisense");

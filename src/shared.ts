@@ -1,13 +1,17 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
 import * as cpptools from 'vscode-cpptools';
 
-const split = require('split-string');
+import split from 'split-string';
 
 import { log } from './logging';
 
-export const CPP_VERSION = 'c++14';
-export const C_VERSION = 'gnu99';
+export const CPP_VERSION: string = 'c++14';
+export const C_VERSION: string = 'gnu99';
 
-const FRAMEWORK_MARKER = ' (framework directory)';
+const FRAMEWORK_MARKER: string = ' (framework directory)';
 
 export interface CompilerInfo {
   compiler: string;
@@ -18,7 +22,10 @@ export interface CompilerInfo {
 }
 
 export function splitCmdLine(cmdline: string): string[] {
-  let stripQuotes = (s: string): string => {
+  return split(cmdline.trim(), {
+    quotes: true,
+    separator: ' ',
+  }).map((s: string): string => {
     if (s.length < 2) {
       return s;
     }
@@ -29,16 +36,11 @@ export function splitCmdLine(cmdline: string): string[] {
     }
 
     return s;
-  };
-
-  return split(cmdline.trim(), {
-    quotes: true,
-    separator: ' ',
-  }).map(stripQuotes);
+  });
 }
 
 export function parseConfigFromCmdLine(compilerInfo: CompilerInfo, cmdline: string): cpptools.SourceFileConfiguration {
-  let args = splitCmdLine(cmdline);
+  let args: string[] = splitCmdLine(cmdline);
 
   let includePath: Set<string> = new Set(compilerInfo.includes);
   let defines: Set<string> = new Set(compilerInfo.defines);
@@ -48,7 +50,7 @@ export function parseConfigFromCmdLine(compilerInfo: CompilerInfo, cmdline: stri
     includePath.add(path);
   }
 
-  let arg;
+  let arg: string|undefined;
   while (arg = args.shift()) {
     if (arg.length < 2 || (arg.charAt(0) !== '-' && arg.charAt(0) !== '/')) {
       log.warn(`Skipping unknown argument: ${JSON.stringify(args)}`);
@@ -65,7 +67,7 @@ export function parseConfigFromCmdLine(compilerInfo: CompilerInfo, cmdline: stri
     }
 
     if (arg === '-include') {
-      let include = args.shift();
+      let include: string|undefined = args.shift();
       if (include) {
         forcedInclude.add(include);
       }
@@ -77,23 +79,25 @@ export function parseConfigFromCmdLine(compilerInfo: CompilerInfo, cmdline: stri
     }
   }
 
-  return {
+  let config: any = {
     includePath: Array.from(includePath),
     defines: Array.from(defines),
     intelliSenseMode: 'clang-x64',
     standard: CPP_VERSION,
     forcedInclude: Array.from(forcedInclude),
   };
+
+  return config;
 }
 
-export function parseCompilerDefaults(info: CompilerInfo, output: string) {
-  let lines = output.trim().split('\n');
+export function parseCompilerDefaults(info: CompilerInfo, output: string): void {
+  let lines: string[] = output.trim().split('\n');
 
   let inIncludes: boolean = false;
   for (let line of lines) {
     if (inIncludes) {
       if (line.charAt(0) === ' ') {
-        let include = line.trim();
+        let include: string = line.trim();
         if (include.endsWith(FRAMEWORK_MARKER)) {
           info.frameworkIncludes.add(include.substring(0, include.length - FRAMEWORK_MARKER.length));
         } else {
@@ -108,8 +112,8 @@ export function parseCompilerDefaults(info: CompilerInfo, output: string) {
     if (line.startsWith('#include ')) {
       inIncludes = true;
     } else if (line.startsWith('#define ')) {
-      let define = line.substring(8).trim();
-      let pos = define.indexOf(" ");
+      let define: string = line.substring(8).trim();
+      let pos: number = define.indexOf(" ");
       if (pos > 0) {
         define = `${define.substring(0, pos)}=${define.substring(pos).trim()}`;
       }
