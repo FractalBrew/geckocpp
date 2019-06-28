@@ -11,7 +11,7 @@ import * as cpptools from 'vscode-cpptools';
 
 import { Workspace } from './workspace';
 import { log } from './logging';
-import { VERSIONS, splitCmdLine, parseCompilerDefaults, CPP_VERSION, CPP_STANDARD, C_VERSION, C_STANDARD, CompilerInfo } from './shared';
+import * as shared from './shared';
 import { config } from './config';
 
 function fsStat(path: string): Promise<fs.Stats> {
@@ -49,13 +49,13 @@ class ProcessError extends Error {
 function exec(command: string, args: string[], options?: SpawnOptions): Promise<ProcessResult> {
   log.debug(`Executing '${command} ${args.join(' ')}'`);
   return new Promise((resolve, reject) => {
-    let process: ChildProcess = spawn(command, args, options);
-
     let output: ProcessResult = {
       code: 0,
       stdout: '',
       stderr: '',
     };
+
+    let process: ChildProcess = spawn(command, args, options);
 
     process.stdout.on('data', (data) => {
       output.stdout += data;
@@ -65,7 +65,18 @@ function exec(command: string, args: string[], options?: SpawnOptions): Promise<
       output.stderr += data;
     });
 
+    let seenError: boolean = false;
+    process.on('error', () => {
+      seenError = true;
+      output.code = -1;
+      reject(new ProcessError(`${command} ${args.join(' ')}`, output));
+    });
+
     process.on('close', (code) => {
+      if (seenError) {
+        return;
+      }
+
       if (code === 0) {
         resolve(output);
       } else {
@@ -91,15 +102,14 @@ function mach(uri: vscode.Uri, machPath: string, args: string[]): Promise<Proces
 }
 
 interface EnvironmentInfo {
-  compilers: CompilerInfo[];
+  compilers: shared.CompilerInfo[];
   topobjdir: string;
   mach: string;
-  macFramework?: string;
+  macSDK?: string;
 }
 
-export class SourceFolder {
-  private workspace: Workspace;
-  private folder: vscode.WorkspaceFolder;
+export class SourceFolder implements shared.StateProvider, shared.Disposable {
+  public readonly folder: vscode.WorkspaceFolder;
   private environmentInfo: EnvironmentInfo|undefined;
 
   public get root(): vscode.Uri {
@@ -136,7 +146,7 @@ export class SourceFolder {
 
       for (let arg of env.mozconfig.configure_args) {
         if (arg.startsWith('--with-macos-sdk=')) {
-          environment.macFramework = arg.substring('--with-macos-sdk='.length);
+          environment.macSDK = arg.substring('--with-macos-sdk='.length);
         }
       }
     } catch (e) {
@@ -152,7 +162,7 @@ export class SourceFolder {
           let testFile: string = path.join(uri.fsPath, `test.${extension}`);
           let output: ProcessResult = await mach(uri, environment.mach, ['compileflags', testFile]);
 
-          let args: string[] = splitCmdLine(output.stdout);
+          let args: string[] = shared.splitCmdLine(output.stdout);
           if (args.length > 0) {
             compiler = args[0];
           } else {
@@ -168,15 +178,15 @@ export class SourceFolder {
 
       // Find the compiler's default preprocessor directives.
       let args: string[] = [];
-      let standard: VERSIONS|undefined;
+      let standard: shared.VERSIONS|undefined;
       switch (extension) {
         case 'c':
-          args.push(`-std=${C_VERSION}`, '-xc');
-          standard = C_STANDARD;
+          args.push(`-std=${shared.C_VERSION}`, '-xc');
+          standard = shared.C_STANDARD;
           break;
         case 'cpp':
-          args.push(`-std=${CPP_VERSION}`, '-xc++');
-          standard = CPP_STANDARD;
+          args.push(`-std=${shared.CPP_VERSION}`, '-xc++');
+          standard = shared.CPP_STANDARD;
           break;
       }
 
@@ -185,7 +195,7 @@ export class SourceFolder {
         continue;
       }
 
-      let info: CompilerInfo = {
+      let info: shared.CompilerInfo = {
         compiler,
         extension,
         standard,
@@ -194,9 +204,9 @@ export class SourceFolder {
         defines: new Map(),
       };
 
-      if (environment.macFramework) {
+      if (environment.macSDK) {
         args.push('-isysroot');
-        args.push(environment.macFramework);
+        args.push(environment.macSDK);
       }
 
       args.push('-Wp,-v', '-E', '-dD', '/dev/null');
@@ -206,8 +216,8 @@ export class SourceFolder {
           windowsHide: true,
         });
 
-        parseCompilerDefaults(info, result.stdout);
-        parseCompilerDefaults(info, result.stderr);
+        shared.parseCompilerDefaults(info, result.stdout);
+        shared.parseCompilerDefaults(info, result.stderr);
 
         if (info.defines.size == 0 || info.includes.size == 0) {
           log.error(`Failed to discover any default includes or defines from ${compiler}`);
@@ -228,14 +238,43 @@ export class SourceFolder {
     return environment;
   }
 
-  public static async create(workspace: Workspace, folder: vscode.WorkspaceFolder): Promise<SourceFolder> {
-    return new SourceFolder(workspace, folder, await SourceFolder.fetchEnvironmentInfo(folder.uri));
+  public static async create(folder: vscode.WorkspaceFolder): Promise<SourceFolder> {
+    return new SourceFolder(folder, await SourceFolder.fetchEnvironmentInfo(folder.uri));
   }
 
-  private constructor(workspace: Workspace, folder: vscode.WorkspaceFolder, environmentInfo: EnvironmentInfo|undefined) {
-    this.workspace = workspace;
+  private constructor(folder: vscode.WorkspaceFolder, environmentInfo: EnvironmentInfo|undefined) {
     this.folder = folder;
     this.environmentInfo = environmentInfo;
+  }
+
+  public async toState(): Promise<any> {
+    let compilerState: (i: shared.CompilerInfo) => Promise<any> = async (info: shared.CompilerInfo): Promise<any> => {
+      return {
+        compiler: info.compiler,
+        extension: info.extension,
+        standard: info.standard,
+        includes: info.includes.size,
+        defines: info.defines.size,
+      };
+    };
+
+    let environmentState: () => Promise<any> = async(): Promise<any> => {
+      if (!this.environmentInfo) {
+        return undefined;
+      }
+
+      return {
+        compilers: await Promise.all(this.environmentInfo.compilers.map(compilerState)),
+        topobjdir: this.environmentInfo.topobjdir,
+        mach: this.environmentInfo.mach,
+        macSDK: this.environmentInfo.macSDK,
+      };
+    };
+
+    return {
+      root: this.folder.uri.toString(),
+      environment: await environmentState(),
+    };
   }
 
   public dispose(): void {
@@ -283,7 +322,7 @@ export class SourceFolder {
     return this.hasMach();
   }
 
-  public getCachedConfiguration(uri: vscode.Uri, getConfig: (folder: SourceFolder, compilerInfo: CompilerInfo, path: string) => Promise<cpptools.SourceFileConfiguration|undefined>): Promise<cpptools.SourceFileConfiguration|undefined> {
+  public getCachedConfiguration(uri: vscode.Uri, getConfig: (folder: SourceFolder, compilerInfo: shared.CompilerInfo, path: string) => Promise<cpptools.SourceFileConfiguration|undefined>): Promise<cpptools.SourceFileConfiguration|undefined> {
     if (!this.environmentInfo) {
       return Promise.resolve(undefined);
     }

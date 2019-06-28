@@ -16,7 +16,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('mozillacpp.resetIntellisense', () => {
       workspace.resetConfiguration();
       workspace.resetBrowseConfiguration();
-    })
+    }),
+    vscode.commands.registerCommand('mozillacpp.dumpState', () => {
+      log.dumpState(workspace);
+    }),
   );
 }
 

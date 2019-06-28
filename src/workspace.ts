@@ -7,8 +7,9 @@ import * as vscode from 'vscode';
 import { SourceFolder } from './folders';
 import { MachConfigurationProvider } from './provider';
 import { log } from './logging';
+import { StateProvider, Disposable } from './shared';
 
-export class Workspace {
+export class Workspace implements StateProvider, Disposable {
   machCount: number = 0;
   folders: Map<vscode.Uri, Promise<SourceFolder>>;
   provider: MachConfigurationProvider|null = null;
@@ -24,6 +25,13 @@ export class Workspace {
     vscode.workspace.onDidChangeWorkspaceFolders(() => this.workspaceChanged);
   }
 
+  public async toState(): Promise<any> {
+    return {
+      machCount: this.machCount,
+      folders: await Promise.all((await Promise.all(this.folders.values())).map((f) => f.toState())),
+    };
+  }
+
   public dispose(): void {
     if (this.provider) {
       this.provider.dispose();
@@ -35,8 +43,33 @@ export class Workspace {
     this.folders.clear();
   }
 
+  private async rebuildFolder(oldFolder: SourceFolder): Promise<void> {
+    let promise: Promise<SourceFolder> = SourceFolder.create(oldFolder.folder);
+    this.folders.set(oldFolder.root, promise);
+    let newFolder: SourceFolder = await promise;
+
+    if (oldFolder.hasMach() !== newFolder.hasMach()) {
+      if (oldFolder.hasMach()) {
+        this.machCount--;
+      } else {
+        this.machCount++;
+      }
+    }
+  }
+
+  public async rebuildFolders(folders: SourceFolder[]): Promise<void> {
+    await Promise.all(folders.map((f) => this.rebuildFolder(f)));
+
+    if (this.machCount > 0 && !this.provider) {
+      this.provider = await MachConfigurationProvider.create(this);
+    } else {
+      this.resetBrowseConfiguration();
+      this.resetConfiguration();
+    }
+  }
+
   private async addFolder(wFolder: vscode.WorkspaceFolder): Promise<void> {
-    let promise: Promise<SourceFolder> = SourceFolder.create(this, wFolder);
+    let promise: Promise<SourceFolder> = SourceFolder.create(wFolder);
     this.folders.set(wFolder.uri, promise);
     let folder: SourceFolder = await promise;
 
@@ -80,6 +113,10 @@ export class Workspace {
       return this.folders.get(wFolder.uri);
     }
     return undefined;
+  }
+
+  public async getAllFolders(): Promise<SourceFolder[]> {
+    return Promise.all(this.folders.values());
   }
 
   public async getMachFolders(): Promise<SourceFolder[]> {

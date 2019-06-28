@@ -52,24 +52,26 @@
   ],
   "main": "./out/main.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "mozillacpp.resetIntellisense",
-        "title": "Reset Intellisense",
-        "category": "Gecko"
-      }
-    ],
+    "commands": [{
+      "command": "mozillacpp.resetIntellisense",
+      "title": "Reset Intellisense",
+      "category": "Mozilla"
+    }, {
+      "command": "mozillacpp.dumpState",
+      "title": "Dump internal state",
+      "category": "Mozilla"
+    }],
     "configuration": {
       "type": "object",
       "title": "Mozilla Intellisense",
       "properties": {
-        "mozillacpp.cpp.compiler": {
+        "mozillacpp.compiler.cpp.path": {
           "type": "string",
           "default": "",
           "description": "Override the automatically detected compiler for cpp files.",
           "scope": "resource"
         },
-        "mozillacpp.c.compiler": {
+        "mozillacpp.compiler.c.path": {
           "type": "string",
           "default": "",
           "description": "Override the automatically detected compiler for c files.",

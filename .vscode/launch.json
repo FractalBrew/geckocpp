@@ -10,6 +10,7 @@
       "request": "launch",
       "runtimeExecutable": "${execPath}",
       "args": [
+        "/Users/dave/mozilla/source/trunk",
         "--extensionDevelopmentPath=${workspaceFolder}"
       ],
       "outFiles": [

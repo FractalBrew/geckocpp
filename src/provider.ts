@@ -8,10 +8,10 @@ import * as vscode from 'vscode';
 import { SourceFolder, ProcessResult } from './folders';
 import { Workspace } from './workspace';
 import { log } from './logging';
-import { parseConfigFromCmdLine, CompilerInfo } from './shared';
+import { parseConfigFromCmdLine, CompilerInfo, Disposable } from './shared';
 import { config } from './config';
 
-export class MachConfigurationProvider implements cpptools.CustomConfigurationProvider {
+export class MachConfigurationProvider implements cpptools.CustomConfigurationProvider, Disposable {
   api: cpptools.CppToolsApi;
   workspace: Workspace;
 

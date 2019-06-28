@@ -18,6 +18,14 @@ export const C_VERSION: string = 'gnu99';
 
 const FRAMEWORK_MARKER: string = ' (framework directory)';
 
+export interface Disposable {
+  dispose(): void;
+}
+
+export interface StateProvider {
+  toState(): Promise<any>;
+}
+
 interface Define {
   key: string;
   value: string;

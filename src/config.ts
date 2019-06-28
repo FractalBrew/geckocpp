@@ -4,6 +4,10 @@
 
 import * as vscode from 'vscode';
 
+import { SourceFolder } from './folders';
+import { workspace } from './workspace';
+import { StateProvider, Disposable } from './shared';
+
 export enum Level {
   Always = 0,
   Debug,
@@ -12,6 +16,9 @@ export enum Level {
   Error,
   Never,
 }
+
+const DEFAULT_LOG_LEVEL: Level = Level.Warn;
+const DEFAULT_LOG_SHOW_LEVEL: Level = Level.Never;
 
 function levelFromStr(name: string|undefined, normal: Level): Level {
   if (!name) {
@@ -36,11 +43,55 @@ function levelFromStr(name: string|undefined, normal: Level): Level {
   }
 }
 
-class Configuration {
+class Configuration implements StateProvider, Disposable {
+  listener: vscode.Disposable;
+  logLevel: Level = DEFAULT_LOG_LEVEL;
+  showLogLevel: Level = DEFAULT_LOG_SHOW_LEVEL;
+
   constructor() {
+    this.listener = vscode.workspace.onDidChangeConfiguration((e) => this.onConfigChange(e));
+    this.fetchLogConfig();
+  }
+
+  async toState(): Promise<any> {
+    return {
+      logLevel: this.logLevel,
+      showLogLevel: this.showLogLevel,
+    };
   }
 
   dispose(): void {
+    this.listener.dispose();
+  }
+
+  private fetchLogConfig(): void {
+    this.logLevel = levelFromStr(this.getRoot().get('log.level'), DEFAULT_LOG_LEVEL);
+    this.showLogLevel = levelFromStr(this.getRoot().get('log.show_level'), DEFAULT_LOG_SHOW_LEVEL);
+  }
+
+  private async onConfigChange(event: vscode.ConfigurationChangeEvent): Promise<void> {
+    if (!event.affectsConfiguration('mozillacpp')) {
+      return;
+    }
+
+    if (event.affectsConfiguration('mozillacpp.log')) {
+      this.fetchLogConfig();
+    }
+
+    if (event.affectsConfiguration('mozillacpp.tag')) {
+      workspace.resetBrowseConfiguration();
+    }
+
+    let folders: SourceFolder[] = await workspace.getAllFolders();
+    let rebuilds: SourceFolder[] = [];
+    for (let folder of folders) {
+      if (event.affectsConfiguration('mozillacpp.compiler', folder.root) ||
+          event.affectsConfiguration('mozillacpp.mach', folder.root)) {
+        rebuilds.push(folder);
+      }
+    }
+
+    workspace.rebuildFolders(rebuilds);
   }
 
   private getRoot(uri?: vscode.Uri): vscode.WorkspaceConfiguration {
@@ -52,7 +103,7 @@ class Configuration {
   }
 
   public getCompiler(folder: vscode.Uri, extension: string): string|undefined {
-    return this.getRoot(folder).get(`${extension}.compiler`) || undefined;
+    return this.getRoot(folder).get(`compiler.${extension}.path`) || undefined;
   }
 
   public getMach(folder: vscode.Uri): string|undefined {
@@ -64,11 +115,11 @@ class Configuration {
   }
 
   public getLogLevel(): Level {
-    return levelFromStr(this.getRoot().get('log.level'), Level.Warn);
+    return this.logLevel;
   }
 
   public getLogShowLevel(): Level {
-    return levelFromStr(this.getRoot().get('log.show_level'), Level.Never);
+    return this.showLogLevel;
   }
 
   public isTagParsingDisable(): boolean {

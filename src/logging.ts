@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 
 import { Level, config } from './config';
+import { Disposable, StateProvider } from './shared';
 
 function serialize(value: any): string {
   if (value === null) {
@@ -43,26 +44,36 @@ function serialize(value: any): string {
   }
 }
 
-class Logger {
-  channel: vscode.OutputChannel;
+class Logger implements Disposable {
+  name: string;
+  channel?: vscode.OutputChannel;
 
-  constructor(name: string) {
-    this.channel = vscode.window.createOutputChannel(name);
+  public constructor(name: string) {
+    this.name = name;
   }
 
-  dispose(): void {
-    this.channel.dispose();
+  public dispose(): void {
+    if (this.channel) {
+      this.channel.dispose();
+    }
   }
 
-  shouldOpen(level: Level): boolean {
+  private shouldOpen(level: Level): boolean {
     return level >= config.getLogShowLevel();
   }
 
-  shouldOutput(level: Level): boolean {
+  private shouldOutput(level: Level): boolean {
     return level >= config.getLogLevel();
   }
 
-  output(level: Level, ...args: any[]): void {
+  private writeOutput(str: string): void {
+    if (!this.channel) {
+      this.channel = vscode.window.createOutputChannel(this.name);
+    }
+    this.channel.appendLine(str);
+  }
+
+  private output(level: Level, ...args: any[]): void {
     let levelstr: string = Level[level];
 
     switch (level) {
@@ -81,26 +92,35 @@ class Logger {
       return;
     }
 
-    this.channel.appendLine(`${levelstr}: ${args.map(serialize).join(' ')}`);
+    this.writeOutput(`${levelstr}: ${args.map(serialize).join(' ')}`);
 
-    if (this.shouldOpen(level)) {
+    if (this.shouldOpen(level) && this.channel) {
       this.channel.show(true);
     }
   }
 
-  debug(...args: any[]): void {
+  public async dumpState(obj: StateProvider): Promise<void> {
+    let str: string = JSON.stringify(await obj.toState(), undefined, 2);
+    this.writeOutput(str);
+
+    if (this.channel) {
+      this.channel.show(true);
+    }
+  }
+
+  public debug(...args: any[]): void {
     this.output(Level.Debug, ...args);
   }
 
-  log(...args: any[]): void {
+  public log(...args: any[]): void {
     this.output(Level.Log, ...args);
   }
 
-  warn(...args: any[]): void {
+  public warn(...args: any[]): void {
     this.output(Level.Warn, ...args);
   }
 
-  error(...args: any[]): void {
+  public error(...args: any[]): void {
     this.output(Level.Error, ...args);
   }
 }
