@@ -219,7 +219,7 @@ export class SourceFolder implements shared.StateProvider, shared.Disposable {
         shared.parseCompilerDefaults(info, result.stdout);
         shared.parseCompilerDefaults(info, result.stderr);
 
-        if (info.defines.size == 0 || info.includes.size == 0) {
+        if (info.defines.size === 0 || info.includes.size === 0) {
           log.error(`Failed to discover any default includes or defines from ${compiler}`);
           log.debug('stdout:', result.stdout);
           log.debug('stderr:', result.stderr);
