@@ -50,13 +50,29 @@ though.
    open the command palette and run `C/C++: Change Configuration Provider` and
    then select `Mozilla` from the options.
 
+## Troubleshooting
+
+If you're seeing issues with strange errors showing up in the editor it is worth
+filing an issue. There are a couple of things you can try to help diagnose the
+issue first (And including that you did this and what happened would be
+immensely helpful when filing the issue).
+
+1. Try restarting Visual Studio Code, re-open the file and wait 5 minutes to
+   see if it resolves.
+2. Open the command palette, run `Mozilla: Reset Intellisense`, wait 5 minutes
+   and see if it resolves.
+
+Finally to provide some info for the issue open the command palette and run
+`Mozilla: Dump internal state`. This should pop open the output window, copy and
+paste the JSON that has been displayed.
+
 ## Configuration
 
-* `mozillacpp.<extension>.compiler` overrides the detected compiler for each
+* `mozillacpp.<file extension>.compiler` overrides the detected compiler for each
   language. Including arguments is not currently supported.
 * `mozillacpp.mach.command` overrides the detected `mach`, useful for supplying
-  a script to configure your build. Including arguments is not currently
-  supported.
+  a script to configure your build before actually calling mach. Including
+  arguments is not currently supported.
 * `mozillacpp.mach.env` sets environment variables to use when running `mach`.
   These are merged with the existing process environment.
 * `mozillacpp.log.level` sets the log level that will show up in the Output
