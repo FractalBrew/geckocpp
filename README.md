@@ -28,8 +28,8 @@ where symbols can't be resolved.
 Since many necessary headers are generated at build time and the build config
 is only updated at build time, intellisense data will not work unless you have
 built your tree since any applicable changes. For example errors may appear if
-you have modified a `moz.build` or `.idl` file since the last build. In some
-cases this extension will be able to detect this and warn you that there is an
+you have modified a `moz.build` or `.idl` file since the last build. In the
+future this extension will try to detect this and warn you that there is an
 issue.
 
 ## Known issues
@@ -57,9 +57,10 @@ filing an issue. There are a couple of things you can try to help diagnose the
 issue first (And including that you did this and what happened would be
 immensely helpful when filing the issue).
 
-1. Try restarting Visual Studio Code, re-open the file and wait 5 minutes to
+1. Try running `mach build-backend`.
+2. Try restarting Visual Studio Code, re-open the file and wait 5 minutes to
    see if it resolves.
-2. Open the command palette, run `Mozilla: Reset Intellisense`, wait 5 minutes
+3. Open the command palette, run `Mozilla: Reset Intellisense`, wait 5 minutes
    and see if it resolves.
 
 Finally to provide some info for the issue open the command palette and run
