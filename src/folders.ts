@@ -69,7 +69,7 @@ class ProcessError extends Error {
   }
 }
 
-function exec(command: string, args: string[], options?: SpawnOptions): Promise<ProcessResult> {
+function exec(command: string, args: string[], options: SpawnOptions): Promise<ProcessResult> {
   log.debug(`Executing '${command} ${args.join(' ')}'`);
   return new Promise((resolve, reject) => {
     let output: ProcessResult = {
@@ -80,13 +80,17 @@ function exec(command: string, args: string[], options?: SpawnOptions): Promise<
 
     let process: ChildProcess = spawn(command, args, options);
 
-    process.stdout.on('data', (data) => {
-      output.stdout += data;
-    });
+    if (process.stdout) {
+      process.stdout.on('data', (data) => {
+        output.stdout += data;
+      });
+    }
 
-    process.stderr.on('data', (data) => {
-      output.stderr += data;
-    });
+    if (process.stderr) {
+        process.stderr.on('data', (data) => {
+        output.stderr += data;
+      });
+    }
 
     let seenError: boolean = false;
     process.on('error', () => {
