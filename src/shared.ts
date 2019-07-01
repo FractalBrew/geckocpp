@@ -34,6 +34,7 @@ interface Define {
 export interface CompilerInfo {
   compiler: string;
   extension: string;
+  hasCCache: boolean;
   standard: VERSIONS;
   frameworkIncludes: Set<string>;
   includes: Set<string>;
@@ -86,6 +87,10 @@ export function parseConfigFromCmdLine(compilerInfo: CompilerInfo, cmdline: stri
 
   for (let path of compilerInfo.frameworkIncludes) {
     includePath.add(path);
+  }
+
+  if (compilerInfo.hasCCache && args.length > 0) {
+    args.shift();
   }
 
   let arg: string|undefined;

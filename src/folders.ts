@@ -9,7 +9,6 @@ import { spawn, SpawnOptions, ChildProcess } from 'child_process';
 import * as vscode from 'vscode';
 import * as cpptools from 'vscode-cpptools';
 
-import { Workspace } from './workspace';
 import { log } from './logging';
 import * as shared from './shared';
 import { config } from './config';
@@ -24,6 +23,30 @@ function fsStat(path: string): Promise<fs.Stats> {
       }
     });
   });
+}
+
+function fsReadFile(path: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    fs.readFile(path, { encoding: 'utf8' }, (err, data) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(data);
+      }
+    });
+  });
+}
+
+function traverse(obj: any, ...path: string[]): any|undefined {
+  if (path.length === 0) {
+    return obj;
+  }
+
+  if (path[0] in obj) {
+    return traverse(obj[path[0]], ...path.slice(1));
+  }
+
+  return undefined;
 }
 
 export interface ProcessResult {
@@ -105,6 +128,7 @@ interface EnvironmentInfo {
   compilers: shared.CompilerInfo[];
   topobjdir: string;
   mach: string;
+  config: Map<string, string>;
   macSDK?: string;
 }
 
@@ -121,6 +145,7 @@ export class SourceFolder implements shared.StateProvider, shared.Disposable {
       compilers: [],
       topobjdir: '',
       mach: '',
+      config: new Map(),
     };
 
     // Are we even a mozilla source tree?
@@ -144,9 +169,21 @@ export class SourceFolder implements shared.StateProvider, shared.Disposable {
       let env: any = JSON.parse((await mach(uri, environment.mach, ['environment', '--format', 'json'])).stdout);
       environment.topobjdir = env.topobjdir;
 
-      for (let arg of env.mozconfig.configure_args) {
-        if (arg.startsWith('--with-macos-sdk=')) {
-          environment.macSDK = arg.substring('--with-macos-sdk='.length);
+      let configureArgs: string[]|null|undefined = traverse(env, 'mozconfig', 'configure_args');
+      if (Array.isArray(configureArgs)) {
+        for (let arg of env.mozconfig.configure_args) {
+          if (arg.startsWith('--with-macos-sdk=')) {
+            environment.macSDK = arg.substring('--with-macos-sdk='.length);
+          }
+        }
+      }
+
+      let autoconf: string = path.join(environment.topobjdir, 'config', 'autoconf.mk');
+      let lines: string[] = (await fsReadFile(autoconf)).split('\n');
+      for (let line of lines) {
+        let pos: number = line.indexOf(' = ');
+        if (pos > 0) {
+          environment.config.set(line.substring(0, pos).trim(), line.substring(pos + 3).trim());
         }
       }
     } catch (e) {
@@ -157,21 +194,26 @@ export class SourceFolder implements shared.StateProvider, shared.Disposable {
     // Figure out the compilers to use.
     for (let extension of ['c', 'cpp']) {
       let compiler: string|undefined = config.getCompiler(uri, extension);
+      let hasCCache: boolean = false;
       if (!compiler) {
-        try {
-          let testFile: string = path.join(uri.fsPath, `test.${extension}`);
-          let output: ProcessResult = await mach(uri, environment.mach, ['compileflags', testFile]);
+        let cmdLine: string|undefined = environment.config.get(extension === 'c' ? 'CC' : 'CXX');
 
-          let args: string[] = shared.splitCmdLine(output.stdout);
-          if (args.length > 0) {
-            compiler = args[0];
-          } else {
-            log.error(`Running mach in ${uri.fsPath} failed to return any output.`);
-            return undefined;
-          }
-        } catch (e) {
-          log.error(`Failed searching for a compiler for ${extension} files.`, e);
-          return undefined;
+        if (!cmdLine) {
+          log.error(`Unable to find a compiler for ${extension} in ${uri.fsPath}.`);
+          continue;
+        }
+
+        let cmdParts: string[] = cmdLine.split(' ');
+        compiler = cmdParts.shift();
+
+        if (cmdParts.length > 0 && environment.config.get('CCACHE') === compiler) {
+          compiler = cmdParts.shift();
+          hasCCache = true;
+        }
+
+        if (!compiler) {
+          log.error(`Unable to find a compiler for ${extension} in ${uri.fsPath}.`);
+          continue;
         }
       }
       log.debug(`Using '${compiler}' for ${extension} defaults.`);
@@ -198,6 +240,7 @@ export class SourceFolder implements shared.StateProvider, shared.Disposable {
       let info: shared.CompilerInfo = {
         compiler,
         extension,
+        hasCCache,
         standard,
         frameworkIncludes: new Set(),
         includes: new Set(),
