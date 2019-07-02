@@ -114,6 +114,10 @@ class Configuration implements StateProvider, Disposable {
     return Object.assign({}, this.getRoot(folder).get('mach.environment') || {}, process.env);
   }
 
+  public getMozillaBuild(): string|undefined {
+    return this.getRoot().get('mozillabuild') || 'C:\\mozilla-build';
+  }
+
   public getLogLevel(): Level {
     return this.logLevel;
   }

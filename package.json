@@ -89,6 +89,12 @@
           "description": "Environment variables to set before running mach. Will be merged with vscode's environment",
           "scope": "resource"
         },
+        "mozillacpp.mozillabuild": {
+          "type": "string",
+          "default": "",
+          "description": "The path to MozillaBuild on Windows. Defaults to 'C:\\mozilla-build'",
+          "scope": "machine"
+        },
         "mozillacpp.tag.disable": {
           "type": "boolean",
           "default": false,
