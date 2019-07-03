@@ -72,13 +72,13 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
       try {
         let folder: SourceFolder|undefined = await this.workspace.getFolder(uri);
         if (!folder || !await folder.isMozillaSource()) {
-          log.debug(`Asked for a configuration for a non-Mozilla file: ${uri.fsPath}`);
+          log.warn(`Asked for a configuration for a non-Mozilla file: ${uri.fsPath}`);
           return undefined;
         }
 
         let config: cpptools.SourceFileConfiguration|undefined = await folder.getSourceConfiguration(uri);
         if (config === undefined) {
-          log.debug(`Unable to find configuration for ${uri.fsPath}.`);
+          log.warn(`Unable to find configuration for ${uri.fsPath}.`);
           return undefined;
         }
 
@@ -133,7 +133,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
     try {
       let folders: SourceFolder[] = await this.workspace.getMozillaFolders();
 
-      let browsePath: Set<vscode.Uri> = new Set();
+      let browsePath: Set<string> = new Set();
 
       for (let folder of folders) {
         for (let path of folder.getIncludePaths()) {
@@ -142,7 +142,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
       }
 
       let config: cpptools.WorkspaceBrowseConfiguration = {
-        browsePath: Array.from(browsePath).map((u) => u.fsPath),
+        browsePath: Array.from(browsePath),
       };
 
       log.debug('Returning browse configuration.', config);

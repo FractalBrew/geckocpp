@@ -5,14 +5,7 @@
 import * as vscode from 'vscode';
 
 import { Level, config } from './config';
-import { Disposable, StateProvider } from './shared';
-
-function isUri(obj: any): obj is vscode.Uri {
-  if (typeof obj === 'object') {
-    return "$mid" in obj;
-  }
-  return false;
-}
+import { Path, Disposable, StateProvider } from './shared';
 
 type LogItemGetter = () => any;
 
@@ -47,55 +40,41 @@ export function logItem(getter: LogItemGetter, actual?: any): LogItem {
   return new LogItem(getter, actual);
 }
 
-function serialize(value: any): string {
+function intoPrimitive(value: any): any {
+  if (Array.isArray(value)) {
+    return value.map(intoPrimitive);
+  }
+
   if (value instanceof LogItem) {
     value = value.getForOutput();
   }
 
   if (value === null) {
-    return '<null>';
-  }
-
-  if (Array.isArray(value)) {
-    return JSON.stringify(value);
+    return null;
   }
 
   if (value instanceof Error) {
     return value.toString();
   }
 
-  if (isUri(value)) {
-    if (value.scheme === 'file') {
-      return value.fsPath;
-    }
-    return value.toString();
+  if (value instanceof Path) {
+    return value.toPath();
   }
 
   switch (typeof value) {
     case 'string':
-      return value;
     case 'undefined':
-      return '<undefined>';
     case 'boolean':
     case 'number':
     case 'bigint':
     case 'symbol':
-      return String(value);
-    case 'function':
-      let args: string = '';
-
-      if (value.length > 0) {
-        let ch: string = 'a';
-        args = ch;
-        for (let i: number = 1; i < value.length; i++) {
-          ch = String.fromCharCode(ch.charCodeAt(0) + 1);
-          args += `, ${ch}`;
-        }
-      }
-
-      return `function ${value.name}(${args}) {}`;
+      return value;
     default:
-      return JSON.stringify(value, null, '  ');
+      let result: any = {};
+      for (let key of Object.keys(value)) {
+        result[key] = intoPrimitive(value[key]);
+      }
+      return result;
   }
 }
 
@@ -152,18 +131,14 @@ class Logger implements Disposable {
       return;
     }
 
-    this.writeOutput(`${levelstr}: ${args.map(serialize).join(' ')}`, this.shouldOpen(level));
+    this.writeOutput(`${levelstr}: ${args.map((a) => JSON.stringify(intoPrimitive(a), null, '  ')).join(' ')}`, this.shouldOpen(level));
   }
 
   public async dumpState(obj: StateProvider): Promise<void> {
     let state: any = await obj.toState();
     console.log('Current state', state);
-    let str: string = JSON.stringify(state, (_key, value) => {
-      if (isUri(value)) {
-        return value.fsPath;
-      }
-      return value;
-    }, 2);
+
+    let str: string = JSON.stringify(intoPrimitive(state), null, 2);
     this.writeOutput(`Mozilla intellisense state: ${str}`, true);
   }
 

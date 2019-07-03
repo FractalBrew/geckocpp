@@ -11,7 +11,7 @@ import * as cpptools from 'vscode-cpptools';
 import { log } from './logging';
 import { config } from './config';
 import { ProcessResult, exec, CmdArgs } from './exec';
-import { into, Disposable, StateProvider } from './shared';
+import { into, Disposable, StateProvider, Path } from './shared';
 import { Compiler, FileType, CompileConfig } from './compiler';
 
 interface MozConfig {
@@ -43,27 +43,34 @@ function intoEnvironment(json: any): MachEnvironment {
 }
 
 class Mach implements Disposable, StateProvider {
-  private srcdir: vscode.Uri;
-  private machPath: vscode.Uri;
+  private srcdir: Path;
+  private command: CmdArgs;
 
-  public constructor(srcdir: vscode.Uri, machPath: vscode.Uri) {
+  public constructor(srcdir: Path, command: CmdArgs) {
     this.srcdir = srcdir;
-    this.machPath = machPath;
+    this.command = command;
   }
 
   public dispose(): void {
   }
 
   public async toState(): Promise<any> {
-    return this.machPath;
+    return {
+      command: this.command,
+      override: await config.getMach(this.srcdir.toUri()),
+      environment: config.getMachEnvironment(this.srcdir.toUri()),
+    };
   }
 
-  private baseExec(args: CmdArgs): Promise<ProcessResult> {
-    let command: vscode.Uri = config.getMach(this.srcdir) || this.machPath;
-    let cmdArgs: CmdArgs = args.slice(0);
-    cmdArgs.unshift(command);
+  private async getCommand(): Promise<CmdArgs> {
+    return (await config.getMach(this.srcdir.toUri())) || this.command.slice(0);
+  }
 
-    return exec(cmdArgs, this.srcdir, config.getMachEnvironment(this.srcdir));
+  private async baseExec(args: CmdArgs): Promise<ProcessResult> {
+    let command: CmdArgs = await this.getCommand();
+    command.push(...args);
+
+    return exec(command, this.srcdir, config.getMachEnvironment(this.srcdir.toUri()));
   }
 
   public async getEnvironment(): Promise<MachEnvironment> {
@@ -79,9 +86,9 @@ class Mach implements Disposable, StateProvider {
 
 export abstract class Build implements Disposable, StateProvider {
   protected mach: Mach;
-  protected srcdir: vscode.Uri;
+  protected srcdir: Path;
 
-  protected constructor(mach: Mach, srcdir: vscode.Uri) {
+  protected constructor(mach: Mach, srcdir: Path) {
     this.mach = mach;
     this.srcdir = srcdir;
   }
@@ -99,9 +106,11 @@ export abstract class Build implements Disposable, StateProvider {
       return undefined;
     }
 
-    let machPath: string = path.join(root.fsPath, 'mach');
+    let srcdir: Path = Path.fromUri(root);
+
+    let machPath: Path = srcdir.join('mach');
     try {
-      let stats: Stats = await fs.stat(machPath);
+      let stats: Stats = await machPath.stat();
       if (!stats.isFile) {
         log.debug(`No mach found in ${root}`);
         return undefined;
@@ -111,30 +120,30 @@ export abstract class Build implements Disposable, StateProvider {
       return undefined;
     }
 
-    let mach: Mach = new Mach(root, vscode.Uri.file(machPath));
+    let mach: Mach = new Mach(srcdir, [machPath]);
 
     try {
       let environment: MachEnvironment = await mach.getEnvironment();
-      if (environment.topsrcdir !== root.fsPath) {
+      if (environment.topsrcdir !== srcdir.toPath()) {
         log.error('Mach environment contained unexpected topsrcdir.');
         return undefined;
       }
-      return RecursiveMakeBuild.build(mach, root, environment);
+      return RecursiveMakeBuild.build(mach, srcdir, environment);
     } catch (e) {
       return undefined;
     }
   }
 
-  public abstract getObjDir(): vscode.Uri;
+  public abstract getObjDir(): Path;
 
-  public abstract getIncludePaths(): Set<vscode.Uri>;
+  public abstract getIncludePaths(): Set<string>;
 
-  public abstract getSourceConfiguration(uri: vscode.Uri): Promise<CompileConfig|undefined>;
+  public abstract getSourceConfiguration(path: Path): Promise<CompileConfig|undefined>;
 }
 
-async function parseConfig(path: string, config: Map<string, string>): Promise<void> {
+async function parseConfig(path: Path, config: Map<string, string>): Promise<void> {
   log.debug(`Parsing config from ${path}`);
-  let lines: string[] = (await fs.readFile(path, { encoding: 'utf8' })).trim().split('\n');
+  let lines: string[] = (await fs.readFile(path.toPath(), { encoding: 'utf8' })).trim().split('\n');
   for (let line of lines) {
     let pos: number = line.indexOf(' = ');
     if (pos > 0) {
@@ -162,7 +171,7 @@ class RecursiveMakeBuild extends Build {
   private cCompiler: Compiler;
   private cppCompiler: Compiler;
 
-  private constructor(mach: Mach, srcdir: vscode.Uri, environment: MachEnvironment, cCompiler: Compiler, cppCompiler: Compiler) {
+  private constructor(mach: Mach, srcdir: Path, environment: MachEnvironment, cCompiler: Compiler, cppCompiler: Compiler) {
     super(mach, srcdir);
     this.environment = environment;
     this.cCompiler = cCompiler;
@@ -182,10 +191,10 @@ class RecursiveMakeBuild extends Build {
     return state;
   }
 
-  public static async build(mach: Mach, srcdir: vscode.Uri, environment: MachEnvironment): Promise<Build|undefined> {
+  public static async build(mach: Mach, srcdir: Path, environment: MachEnvironment): Promise<Build|undefined> {
     let config: Map<string, string> = new Map();
 
-    let baseConfig: string = path.join(environment.topobjdir, 'config', 'autoconf.mk');
+    let baseConfig: Path = Path.fromPath(path.join(environment.topobjdir, 'config', 'autoconf.mk'));
     await parseConfig(baseConfig, config);
 
     let cPath: string|undefined = config.get('_CC');
@@ -202,8 +211,8 @@ class RecursiveMakeBuild extends Build {
 
     try {
       return new RecursiveMakeBuild(mach, srcdir, environment,
-        await Compiler.create(vscode.Uri.file(cPath), FileType.C, config),
-        await Compiler.create(vscode.Uri.file(cppPath), FileType.CPP, config),
+        await Compiler.create(srcdir, [Path.fromPath(cPath)], FileType.C, config),
+        await Compiler.create(srcdir, [Path.fromPath(cppPath)], FileType.CPP, config),
       );
     } catch (e) {
       log.error('Failed to find compilers.', e);
@@ -211,15 +220,15 @@ class RecursiveMakeBuild extends Build {
     }
   }
 
-  public getObjDir(): vscode.Uri {
-    return vscode.Uri.file(this.environment.topobjdir);
+  public getObjDir(): Path {
+    return Path.fromPath(this.environment.topobjdir);
   }
 
-  public getIncludePaths(): Set<vscode.Uri> {
-    let result: Set<vscode.Uri> = new Set();
+  public getIncludePaths(): Set<string> {
+    let result: Set<string> = new Set();
 
-    result.add(this.srcdir);
-    result.add(this.getObjDir());
+    result.add(this.srcdir.toPath());
+    result.add(this.getObjDir().toPath());
 
     for (let path of this.cCompiler.getIncludePaths()) {
       result.add(path);
@@ -232,10 +241,9 @@ class RecursiveMakeBuild extends Build {
     return result;
   }
 
-  public async getSourceConfiguration(uri: vscode.Uri): Promise<CompileConfig|undefined> {
-    let type: string = path.extname(uri.fsPath);
-    let relativeDir: string = path.relative(this.srcdir.fsPath, path.dirname(uri.fsPath));
-    let backend: string = path.join(this.getObjDir().fsPath, relativeDir, 'backend.mk');
+  public async getSourceConfiguration(source: Path): Promise<CompileConfig|undefined> {
+    let type: string = source.extname();
+    let backend: Path = source.parent().rebase(this.srcdir, this.getObjDir()).join('backend.mk');
     let dirConfig: Map<string, string> = new Map();
     await parseConfig(backend, dirConfig);
 

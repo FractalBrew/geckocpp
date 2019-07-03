@@ -5,11 +5,11 @@
 import * as vscode from 'vscode';
 import * as cpptools from 'vscode-cpptools';
 
-import * as shared from './shared';
 import { Build } from './build';
 import { CompileConfig, Define } from './compiler';
+import { Path, Disposable, StateProvider } from './shared';
 
-export class SourceFolder implements shared.StateProvider, shared.Disposable {
+export class SourceFolder implements StateProvider, Disposable {
   public readonly folder: vscode.WorkspaceFolder;
   private build: Build|undefined;
 
@@ -45,10 +45,10 @@ export class SourceFolder implements shared.StateProvider, shared.Disposable {
   }
 
   public getTopObjDir(): vscode.Uri {
-    return this.build ? this.build.getObjDir() : this.folder.uri;
+    return this.build ? this.build.getObjDir().toUri() : this.folder.uri;
   }
 
-  public getIncludePaths(): Set<vscode.Uri> {
+  public getIncludePaths(): Set<string> {
     if (!this.build) {
       return new Set();
     }
@@ -65,7 +65,7 @@ export class SourceFolder implements shared.StateProvider, shared.Disposable {
       return `${define.key}=${define.value}`;
     }
 
-    let config: CompileConfig|undefined = await this.build.getSourceConfiguration(uri);
+    let config: CompileConfig|undefined = await this.build.getSourceConfiguration(Path.fromUri(uri));
     if (config) {
       return {
         includePath: Array.from(config.includes),

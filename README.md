@@ -76,10 +76,10 @@ paste the JSON that has been displayed.
 ## Configuration
 
 * `mozillacpp.<file extension>.compiler` overrides the detected compiler for each
-  language. Including arguments is not currently supported.
+  language. This can include additional command line arguments.
 * `mozillacpp.mach.command` overrides the detected `mach`, useful for supplying
-  a script to configure your build before actually calling mach. Including
-  arguments is not currently supported.
+  a script to configure your build before actually calling mach. This can
+  include additional command line arguments.
 * `mozillacpp.mach.env` sets environment variables to use when running `mach`.
   These are merged with the existing process environment.
 * `mozillacpp.mozillabuild` sets the path to the [MozillaBuild](https://wiki.mozilla.org/MozillaBuild)

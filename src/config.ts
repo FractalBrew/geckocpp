@@ -2,11 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { promises as fs, Stats } from 'fs';
+
 import * as vscode from 'vscode';
 
 import { SourceFolder } from './folders';
 import { workspace } from './workspace';
-import { StateProvider, Disposable } from './shared';
+import { Path, StateProvider, Disposable, splitCmdLine } from './shared';
+import { CmdArgs } from './exec';
+import { FileType } from './compiler';
 
 export enum Level {
   Always = 0,
@@ -19,6 +23,26 @@ export enum Level {
 
 const DEFAULT_LOG_LEVEL: Level = Level.Warn;
 const DEFAULT_LOG_SHOW_LEVEL: Level = Level.Never;
+
+async function asCmdArgs(cmdLine: string): Promise<CmdArgs> {
+  async function isPath(arg: string): Promise<boolean> {
+    try {
+      let stat: Stats = await fs.stat(arg);
+      return stat.isFile();
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function fixup(arg: string): Promise<string|Path> {
+    if (await isPath(arg)) {
+      return Path.fromPath(arg);
+    }
+    return arg;
+  }
+
+  return Promise.all(splitCmdLine(cmdLine).map(fixup));
+}
 
 function levelFromStr(name: string|undefined, normal: Level): Level {
   if (!name) {
@@ -102,18 +126,18 @@ class Configuration implements StateProvider, Disposable {
     }
   }
 
-  public getCompiler(folder: vscode.Uri, extension: string): vscode.Uri|undefined {
-    let compiler: string|undefined = this.getRoot(folder).get(`compiler.${extension}.path`);
+  public async getCompiler(folder: vscode.Uri, type: FileType): Promise<CmdArgs|undefined> {
+    let compiler: string|undefined = this.getRoot(folder).get(`compiler.${type}.path`);
     if (compiler) {
-      return vscode.Uri.file(compiler);
+      return asCmdArgs(compiler);
     }
     return undefined;
   }
 
-  public getMach(folder: vscode.Uri): vscode.Uri|undefined {
+  public async getMach(folder: vscode.Uri): Promise<CmdArgs|undefined> {
     let mach: string|undefined = this.getRoot(folder).get('mach.path');
     if (mach) {
-      return vscode.Uri.file(mach);
+      return asCmdArgs(mach);
     }
     return undefined;
   }
@@ -122,8 +146,8 @@ class Configuration implements StateProvider, Disposable {
     return Object.assign({}, this.getRoot(folder).get('mach.environment') || {}, process.env);
   }
 
-  public getMozillaBuild(): vscode.Uri {
-    return vscode.Uri.file(this.getRoot().get('mozillabuild') || 'C:\\mozilla-build');
+  public getMozillaBuild(): Path {
+    return Path.fromPath(this.getRoot().get('mozillabuild') || 'C:\\mozilla-build');
   }
 
   public getLogLevel(): Level {

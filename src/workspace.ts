@@ -55,6 +55,8 @@ export class Workspace implements StateProvider, Disposable {
         this.mozillaCount++;
       }
     }
+
+    oldFolder.dispose();
   }
 
   public async rebuildFolders(folders: SourceFolder[]): Promise<void> {

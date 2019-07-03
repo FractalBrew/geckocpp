@@ -9,6 +9,7 @@ import * as vscode from 'vscode';
 
 import { log } from './logging';
 import { config } from './config';
+import { Path } from './shared';
 
 export interface ProcessResult {
   code: number;
@@ -27,10 +28,10 @@ export class ProcessError extends Error {
   }
 }
 
-export type CmdArgs = (string|vscode.Uri)[];
-type Exec = (args: CmdArgs, cwd?: vscode.Uri, env?: NodeJS.ProcessEnv) => Promise<ProcessResult>;
+export type CmdArgs = (string|Path)[];
+type Exec = (args: CmdArgs, cwd?: Path, env?: NodeJS.ProcessEnv) => Promise<ProcessResult>;
 
-function baseExec(command: string, args: string[], cwd?: string, env?: NodeJS.ProcessEnv): Promise<ProcessResult> {
+function baseExec(command: string, args: string[], cwd?: Path, env?: NodeJS.ProcessEnv): Promise<ProcessResult> {
   log.debug(`Executing '${command} ${args.join(' ')}'`);
   return new Promise((resolve, reject) => {
     let output: ProcessResult = {
@@ -40,7 +41,7 @@ function baseExec(command: string, args: string[], cwd?: string, env?: NodeJS.Pr
     };
 
     let childProcess: ChildProcess = spawn(command, args, {
-      cwd,
+      cwd: cwd ? cwd.toPath() : undefined,
       env: env || process.env,
       windowsHide: true,
       shell: false,
@@ -71,10 +72,10 @@ function baseExec(command: string, args: string[], cwd?: string, env?: NodeJS.Pr
   });
 }
 
-let spawnExec: Exec = (args: CmdArgs, cwd?: vscode.Uri, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
-  function convertArg(arg: string|vscode.Uri): string {
-    if (arg instanceof vscode.Uri) {
-      return arg.fsPath;
+let spawnExec: Exec = (args: CmdArgs, cwd?: Path, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
+  function convertArg(arg: string|Path): string {
+    if (arg instanceof Path) {
+      return arg.toPath();
     }
 
     return arg;
@@ -84,20 +85,20 @@ let spawnExec: Exec = (args: CmdArgs, cwd?: vscode.Uri, env?: NodeJS.ProcessEnv)
   let command: string|undefined = cmdArgs.shift();
 
   if (command) {
-    return baseExec(command, cmdArgs, cwd ? cwd.fsPath : undefined, env);
+    return baseExec(command, cmdArgs, cwd, env);
   }
   throw new ProcessError('Invalid arguments passed to SpawnExec (no command).');
 };
 
-let mozillaBuildExec: Exec = async (args: CmdArgs, cwd?: vscode.Uri, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
-  function convertFile(name: string): string {
+let mozillaBuildExec: Exec = async (args: CmdArgs, cwd?: Path, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
+  function convertFile(path: Path): string {
     // TODO convert name.
-    return name;
+    return path.toPath();
   }
 
-  function convertArg(arg: string|vscode.Uri): string {
-    if (arg instanceof vscode.Uri) {
-      return convertFile(arg.fsPath);
+  function convertArg(arg: string|Path): string {
+    if (arg instanceof Path) {
+      return convertFile(arg);
     }
 
     return arg;
@@ -110,18 +111,18 @@ let mozillaBuildExec: Exec = async (args: CmdArgs, cwd?: vscode.Uri, env?: NodeJ
     }
   }
 
-  let mozillaBuild: string = config.getMozillaBuild().fsPath;
+  let mozillaBuild: Path = config.getMozillaBuild();
   env = Object.assign({
-    MOZILLABUILD: mozillaBuild,
+    MOZILLABUILD: mozillaBuild.toPath(),
   }, env);
 
   // TODO this is wrong.
   let cmdArgs: string[] = args.map(convertArg);
   cmdArgs.unshift('--login', '-i', '-c');
-  let command: string = path.join(mozillaBuild, 'msys', 'bin', 'bash.exe');
+  let command: string = mozillaBuild.join('msys', 'bin', 'bash.exe').toPath();
 
   try {
-    let result: ProcessResult = await baseExec(command, cmdArgs, cwd ? cwd.fsPath : undefined, env);
+    let result: ProcessResult = await baseExec(command, cmdArgs, cwd, env);
     fixOutput(result);
     return result;
   } catch (e) {
@@ -130,7 +131,7 @@ let mozillaBuildExec: Exec = async (args: CmdArgs, cwd?: vscode.Uri, env?: NodeJ
   }
 };
 
-export let exec: Exec = (args: CmdArgs, cwd?: vscode.Uri, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
+export let exec: Exec = (args: CmdArgs, cwd?: Path, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
   let internal: Exec = process.platform === 'win32' ? mozillaBuildExec : spawnExec;
   return internal(args, cwd, env);
 };

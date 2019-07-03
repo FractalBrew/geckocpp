@@ -2,14 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import * as vscode from 'vscode';
-
-import { Options } from 'split-string';
-let split: (str: string, options: Options) => string[] = require('split-string');
-
 import { ProcessResult, exec, CmdArgs } from './exec';
 import { log } from './logging';
-import { Disposable, StateProvider } from './shared';
+import { Path, Disposable, StateProvider, splitCmdLine } from './shared';
+import { config } from './config';
 
 type VERSIONS = 'c89' | 'c99' | 'c11' | 'c++98' | 'c++03' | 'c++11' | 'c++14' | 'c++17';
 type INTELLISENSE_MODES = 'msvc-x64' | 'gcc-x64' | 'clang-x64';
@@ -20,24 +16,6 @@ const CPP_STANDARD: VERSIONS = 'c++14';
 const CPP_VERSION: string = CPP_STANDARD;
 const C_STANDARD: VERSIONS = 'c99';
 const C_VERSION: string = 'gnu99';
-
-function splitCmdLine(cmdline: string): string[] {
-  return split(cmdline.trim(), {
-    quotes: true,
-    separator: ' ',
-  }).map((s: string): string => {
-    if (s.length < 2) {
-      return s;
-    }
-
-    if ((s.startsWith('\'') && s.endsWith('\'')) ||
-        (s.startsWith('"') && s.endsWith('"'))) {
-      return s.substring(1, s.length - 1);
-    }
-
-    return s;
-  });
-}
 
 export enum FileType {
   C = 'c',
@@ -115,12 +93,14 @@ function addCompilerArgumentsToConfig(cmdLine: string|undefined, forceIncludeArg
 }
 
 export abstract class Compiler implements Disposable, StateProvider {
-  protected path: vscode.Uri;
+  protected srcdir: Path;
+  protected command: CmdArgs;
   protected type: FileType;
   protected defaults: CompileConfig;
 
-  protected constructor(path: vscode.Uri, type: FileType, defaults: CompileConfig) {
-    this.path = path;
+  protected constructor(srcdir: Path, command: CmdArgs, type: FileType, defaults: CompileConfig) {
+    this.srcdir = srcdir;
+    this.command = command;
     this.type = type;
     this.defaults = defaults;
   }
@@ -130,13 +110,15 @@ export abstract class Compiler implements Disposable, StateProvider {
 
   public async toState(): Promise<any> {
     return {
-      command: this.getCommand(),
+      type: this.type,
+      command: this.command,
+      override: await config.getCompiler(this.srcdir.toUri(), this.type),
       includes: this.defaults.includes.size,
       defines: this.defaults.defines.size,
     };
   }
 
-  public static async create(path: vscode.Uri, type: FileType, config: Map<string, string>): Promise<Compiler> {
+  public static async create(srcdir: Path, command: CmdArgs, type: FileType, config: Map<string, string>): Promise<Compiler> {
     let compilerType: string|undefined = config.get('CC_TYPE');
     if (!compilerType) {
       throw new Error('Unable to determine compiler types.');
@@ -144,35 +126,31 @@ export abstract class Compiler implements Disposable, StateProvider {
 
     switch (compilerType) {
       case 'clang':
-        return ClangCompiler.fetch(path, type, config);
+        return ClangCompiler.fetch(srcdir, command, type, config);
       case 'clang-cl':
       case 'msvc':
-        return MsvcCompiler.fetch(path, type, compilerType);
+        return MsvcCompiler.fetch(srcdir, command, type, compilerType);
       default:
         throw new Error(`Unknown compiler type ${compilerType}.`);
     }
   }
 
-  protected getCommand(): CmdArgs {
-    return [this.path];
+  protected async getCommand(): Promise<CmdArgs> {
+    return (await config.getCompiler(this.srcdir.toUri(), this.type)) || this.command.slice(0);
   }
 
   public getDefaultConfiguration(): CompileConfig {
     return cloneConfig(this.defaults);
   }
 
-  public getIncludePaths(): Set<vscode.Uri> {
-    return new Set(Array.from(this.defaults.includes).map((f) => vscode.Uri.file(f)));
+  public getIncludePaths(): Set<string> {
+    return new Set(this.defaults.includes);
   }
 
   public abstract addCompilerArgumentsToConfig(cmdLine: string|undefined, config: CompileConfig): void;
 }
 
 class ClangCompiler extends Compiler {
-  private constructor(path: vscode.Uri, type: FileType, defaults: CompileConfig) {
-    super(path, type, defaults);
-  }
-
   public dispose(): void {
     super.dispose();
   }
@@ -211,33 +189,33 @@ class ClangCompiler extends Compiler {
     }
   }
 
-  public static async fetch(path: vscode.Uri, type: FileType, config: Map<string, string>): Promise<Compiler> {
+  public static async fetch(srcdir: Path, command: CmdArgs, type: FileType, buildConfig: Map<string, string>): Promise<Compiler> {
     let sdk: string|undefined = undefined;
     if (process.platform === 'darwin') {
-      sdk = config.get('MACOS_SDK_DIR');
+      sdk = buildConfig.get('MACOS_SDK_DIR');
     }
 
-    let command: CmdArgs = [path];
+    let defaultCmd: CmdArgs = (await config.getCompiler(srcdir.toUri(), type)) || command.slice(0);
 
     switch (type) {
       case FileType.CPP:
-        command.push(`-std=${CPP_VERSION}`, '-xc++');
+        defaultCmd.push(`-std=${CPP_VERSION}`, '-xc++');
         break;
       case FileType.C:
-        command.push(`-std=${C_VERSION}`, '-xc');
+        defaultCmd.push(`-std=${C_VERSION}`, '-xc');
         break;
     }
 
     if (sdk) {
       if (process.platform === 'darwin') {
-        command.push('-isysroot', sdk);
+        defaultCmd.push('-isysroot', sdk);
       }
     }
 
-    command.push('-Wp,-v', '-E', '-dD', '/dev/null');
+    defaultCmd.push('-Wp,-v', '-E', '-dD', '/dev/null');
 
     try {
-      let result: ProcessResult = await exec(command);
+      let result: ProcessResult = await exec(defaultCmd);
 
       let defaults: CompileConfig = {
         includes: new Set(),
@@ -254,7 +232,7 @@ class ClangCompiler extends Compiler {
         throw new Error('Compiler returned empty includes or defined.');
       }
 
-      return new ClangCompiler(path, type, defaults);
+      return new ClangCompiler(srcdir, command, type, defaults);
     } catch (e) {
       log.error('Failed to get compiler defaults', e);
       throw e;
@@ -277,7 +255,7 @@ class MsvcCompiler extends Compiler {
     return state;
   }
 
-  public static async fetch(path: vscode.Uri, type: FileType, compilerType: string): Promise<Compiler> {
+  public static async fetch(srcdir: Path, command: CmdArgs, type: FileType, compilerType: string): Promise<Compiler> {
     let defaults: CompileConfig = {
       includes: new Set(),
       defines: new Map(),
@@ -290,7 +268,7 @@ class MsvcCompiler extends Compiler {
       throw new Error('Compiler returned empty includes or defined.');
     }
 
-    return new MsvcCompiler(path, type, defaults);
+    return new MsvcCompiler(srcdir, command, type, defaults);
   }
 
   public addCompilerArgumentsToConfig(cmdLine: string|undefined, config: CompileConfig): void {
