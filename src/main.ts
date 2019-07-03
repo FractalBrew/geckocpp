@@ -9,6 +9,7 @@ import { config } from './config';
 import { log } from './logging';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  console.log(process.versions);
   context.subscriptions.push(
     config,
     log,

@@ -142,7 +142,7 @@
     "tslint": "^5.18.0",
     "vrsource-tslint-rules": "^6.0.0",
     "tslint-microsoft-contrib": "^6.2.0",
-    "@types/node": "^12.0.10",
+    "@types/node": "^10.11.0",
     "@types/mocha": "^5.2.7",
     "vscode-cpptools": "^2.1.2",
     "vscode-jsonrpc": "3.5.0"
