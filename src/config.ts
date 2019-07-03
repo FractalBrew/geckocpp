@@ -8,7 +8,7 @@ import * as vscode from 'vscode';
 
 import { SourceFolder } from './folders';
 import { workspace } from './workspace';
-import { Path, StateProvider, Disposable, splitCmdLine } from './shared';
+import { FilePath, StateProvider, Disposable, splitCmdLine } from './shared';
 import { CmdArgs } from './exec';
 import { FileType } from './compiler';
 
@@ -34,9 +34,9 @@ async function asCmdArgs(cmdLine: string): Promise<CmdArgs> {
     }
   }
 
-  async function fixup(arg: string): Promise<string|Path> {
+  async function fixup(arg: string): Promise<string|FilePath> {
     if (await isPath(arg)) {
-      return Path.fromPath(arg);
+      return FilePath.fromPath(arg);
     }
     return arg;
   }
@@ -146,8 +146,8 @@ class Configuration implements StateProvider, Disposable {
     return Object.assign({}, this.getRoot(folder).get('mach.environment') || {}, process.env);
   }
 
-  public getMozillaBuild(): Path {
-    return Path.fromPath(this.getRoot().get('mozillabuild') || 'C:\\mozilla-build');
+  public getMozillaBuild(): FilePath {
+    return FilePath.fromPath(this.getRoot().get('mozillabuild') || 'C:\\mozilla-build');
   }
 
   public getLogLevel(): Level {

@@ -4,7 +4,7 @@
 
 import { ProcessResult, exec, CmdArgs } from './exec';
 import { log } from './logging';
-import { Path, Disposable, StateProvider, splitCmdLine } from './shared';
+import { FilePath, Disposable, StateProvider, splitCmdLine, FilePathSet } from './shared';
 import { config } from './config';
 
 type VERSIONS = 'c89' | 'c99' | 'c11' | 'c++98' | 'c++03' | 'c++11' | 'c++14' | 'c++17';
@@ -43,18 +43,18 @@ function buildDefine(text: string, splitter: string): Define {
 }
 
 export interface CompileConfig {
-  includes: Set<string>;
+  includes: FilePathSet;
   defines: Map<string, Define>;
-  forcedIncludes: Set<string>;
+  forcedIncludes: FilePathSet;
   intelliSenseMode: INTELLISENSE_MODES;
   standard: VERSIONS;
 }
 
 function cloneConfig(config: CompileConfig): CompileConfig {
   return {
-    includes: new Set(config.includes),
+    includes: new FilePathSet(config.includes),
     defines: new Map(config.defines),
-    forcedIncludes: new Set(config.forcedIncludes),
+    forcedIncludes: new FilePathSet(config.forcedIncludes),
     intelliSenseMode: config.intelliSenseMode,
     standard: config.standard,
   };
@@ -78,14 +78,14 @@ function addCompilerArgumentsToConfig(cmdLine: string|undefined, forceIncludeArg
         config.defines.set(define.key, define);
         continue;
       case 'I':
-        config.includes.add(arg.substring(2));
+        config.includes.add(FilePath.fromPath(arg.substring(2)));
         continue;
     }
 
     if (arg === forceIncludeArg) {
       let include: string|undefined = args.shift();
       if (include) {
-        config.forcedIncludes.add(include);
+        config.forcedIncludes.add(FilePath.fromPath(include));
       }
       continue;
     }
@@ -93,12 +93,12 @@ function addCompilerArgumentsToConfig(cmdLine: string|undefined, forceIncludeArg
 }
 
 export abstract class Compiler implements Disposable, StateProvider {
-  protected srcdir: Path;
+  protected srcdir: FilePath;
   protected command: CmdArgs;
   protected type: FileType;
   protected defaults: CompileConfig;
 
-  protected constructor(srcdir: Path, command: CmdArgs, type: FileType, defaults: CompileConfig) {
+  protected constructor(srcdir: FilePath, command: CmdArgs, type: FileType, defaults: CompileConfig) {
     this.srcdir = srcdir;
     this.command = command;
     this.type = type;
@@ -118,7 +118,7 @@ export abstract class Compiler implements Disposable, StateProvider {
     };
   }
 
-  public static async create(srcdir: Path, command: CmdArgs, type: FileType, config: Map<string, string>): Promise<Compiler> {
+  public static async create(srcdir: FilePath, command: CmdArgs, type: FileType, config: Map<string, string>): Promise<Compiler> {
     let compilerType: string|undefined = config.get('CC_TYPE');
     if (!compilerType) {
       throw new Error('Unable to determine compiler types.');
@@ -143,8 +143,8 @@ export abstract class Compiler implements Disposable, StateProvider {
     return cloneConfig(this.defaults);
   }
 
-  public getIncludePaths(): Set<string> {
-    return new Set(this.defaults.includes);
+  public getIncludePaths(): FilePathSet {
+    return new FilePathSet(this.defaults.includes);
   }
 
   public abstract addCompilerArgumentsToConfig(cmdLine: string|undefined, config: CompileConfig): void;
@@ -170,9 +170,9 @@ class ClangCompiler extends Compiler {
         if (line.charAt(0) === ' ') {
           let include: string = line.trim();
           if (include.endsWith(FRAMEWORK_MARKER)) {
-            defaults.includes.add(include.substring(0, include.length - FRAMEWORK_MARKER.length));
+            defaults.includes.add(FilePath.fromPath(include.substring(0, include.length - FRAMEWORK_MARKER.length)));
           } else {
-            defaults.includes.add(include);
+            defaults.includes.add(FilePath.fromPath(include));
           }
           continue;
         } else {
@@ -189,7 +189,7 @@ class ClangCompiler extends Compiler {
     }
   }
 
-  public static async fetch(srcdir: Path, command: CmdArgs, type: FileType, buildConfig: Map<string, string>): Promise<Compiler> {
+  public static async fetch(srcdir: FilePath, command: CmdArgs, type: FileType, buildConfig: Map<string, string>): Promise<Compiler> {
     let sdk: string|undefined = undefined;
     if (process.platform === 'darwin') {
       sdk = buildConfig.get('MACOS_SDK_DIR');
@@ -218,9 +218,9 @@ class ClangCompiler extends Compiler {
       let result: ProcessResult = await exec(defaultCmd);
 
       let defaults: CompileConfig = {
-        includes: new Set(),
+        includes: new FilePathSet(),
         defines: new Map(),
-        forcedIncludes: new Set(),
+        forcedIncludes: new FilePathSet(),
         intelliSenseMode: 'clang-x64' as INTELLISENSE_MODES,
         standard: type === FileType.C ? C_STANDARD : CPP_STANDARD,
       };
@@ -229,7 +229,7 @@ class ClangCompiler extends Compiler {
       ClangCompiler.parseCompilerDefaults(result.stderr, defaults);
 
       if (defaults.includes.size === 0 || defaults.defines.size === 0) {
-        throw new Error('Compiler returned empty includes or defined.');
+        throw new Error('Compiler returned empty includes or defines.');
       }
 
       return new ClangCompiler(srcdir, command, type, defaults);
@@ -255,11 +255,11 @@ class MsvcCompiler extends Compiler {
     return state;
   }
 
-  public static async fetch(srcdir: Path, command: CmdArgs, type: FileType, compilerType: string): Promise<Compiler> {
+  public static async fetch(srcdir: FilePath, command: CmdArgs, type: FileType, compilerType: string): Promise<Compiler> {
     let defaults: CompileConfig = {
-      includes: new Set(),
+      includes: new FilePathSet(),
       defines: new Map(),
-      forcedIncludes: new Set(),
+      forcedIncludes: new FilePathSet(),
       intelliSenseMode: compilerType === 'msvc' ? 'msvc-x64' : 'clang-x64' as INTELLISENSE_MODES,
       standard: type === FileType.C ? C_STANDARD : CPP_STANDARD,
     };

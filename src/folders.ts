@@ -7,7 +7,7 @@ import * as cpptools from 'vscode-cpptools';
 
 import { Build } from './build';
 import { CompileConfig, Define } from './compiler';
-import { Path, Disposable, StateProvider } from './shared';
+import { FilePath, Disposable, StateProvider, FilePathSet } from './shared';
 
 export class SourceFolder implements StateProvider, Disposable {
   public readonly folder: vscode.WorkspaceFolder;
@@ -48,9 +48,9 @@ export class SourceFolder implements StateProvider, Disposable {
     return this.build ? this.build.getObjDir().toUri() : this.folder.uri;
   }
 
-  public getIncludePaths(): Set<string> {
+  public getIncludePaths(): FilePathSet {
     if (!this.build) {
-      return new Set();
+      return new FilePathSet();
     }
 
     return this.build.getIncludePaths();
@@ -65,12 +65,12 @@ export class SourceFolder implements StateProvider, Disposable {
       return `${define.key}=${define.value}`;
     }
 
-    let config: CompileConfig|undefined = await this.build.getSourceConfiguration(Path.fromUri(uri));
+    let config: CompileConfig|undefined = await this.build.getSourceConfiguration(FilePath.fromUri(uri));
     if (config) {
       return {
-        includePath: Array.from(config.includes),
+        includePath: Array.from(config.includes).map((p) => p.toPath()),
         defines: Array.from(config.defines.values()).map(outputDefine),
-        forcedInclude: Array.from(config.forcedIncludes),
+        forcedInclude: Array.from(config.forcedIncludes).map((p) => p.toPath()),
         intelliSenseMode: config.intelliSenseMode,
         standard: config.standard,
       };

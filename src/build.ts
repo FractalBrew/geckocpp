@@ -6,12 +6,11 @@ import * as path from 'path';
 import { Stats, promises as fs } from 'fs';
 
 import * as vscode from 'vscode';
-import * as cpptools from 'vscode-cpptools';
 
 import { log } from './logging';
 import { config } from './config';
 import { ProcessResult, exec, CmdArgs } from './exec';
-import { into, Disposable, StateProvider, Path } from './shared';
+import { into, Disposable, StateProvider, FilePath, FilePathSet } from './shared';
 import { Compiler, FileType, CompileConfig } from './compiler';
 
 interface MozConfig {
@@ -43,10 +42,10 @@ function intoEnvironment(json: any): MachEnvironment {
 }
 
 class Mach implements Disposable, StateProvider {
-  private srcdir: Path;
+  private srcdir: FilePath;
   private command: CmdArgs;
 
-  public constructor(srcdir: Path, command: CmdArgs) {
+  public constructor(srcdir: FilePath, command: CmdArgs) {
     this.srcdir = srcdir;
     this.command = command;
   }
@@ -86,9 +85,9 @@ class Mach implements Disposable, StateProvider {
 
 export abstract class Build implements Disposable, StateProvider {
   protected mach: Mach;
-  protected srcdir: Path;
+  protected srcdir: FilePath;
 
-  protected constructor(mach: Mach, srcdir: Path) {
+  protected constructor(mach: Mach, srcdir: FilePath) {
     this.mach = mach;
     this.srcdir = srcdir;
   }
@@ -106,9 +105,9 @@ export abstract class Build implements Disposable, StateProvider {
       return undefined;
     }
 
-    let srcdir: Path = Path.fromUri(root);
+    let srcdir: FilePath = FilePath.fromUri(root);
 
-    let machPath: Path = srcdir.join('mach');
+    let machPath: FilePath = srcdir.join('mach');
     try {
       let stats: Stats = await machPath.stat();
       if (!stats.isFile) {
@@ -134,14 +133,14 @@ export abstract class Build implements Disposable, StateProvider {
     }
   }
 
-  public abstract getObjDir(): Path;
+  public abstract getObjDir(): FilePath;
 
-  public abstract getIncludePaths(): Set<string>;
+  public abstract getIncludePaths(): FilePathSet;
 
-  public abstract getSourceConfiguration(path: Path): Promise<CompileConfig|undefined>;
+  public abstract getSourceConfiguration(path: FilePath): Promise<CompileConfig|undefined>;
 }
 
-async function parseConfig(path: Path, config: Map<string, string>): Promise<void> {
+async function parseConfig(path: FilePath, config: Map<string, string>): Promise<void> {
   log.debug(`Parsing config from ${path}`);
   let lines: string[] = (await fs.readFile(path.toPath(), { encoding: 'utf8' })).trim().split('\n');
   for (let line of lines) {
@@ -171,7 +170,7 @@ class RecursiveMakeBuild extends Build {
   private cCompiler: Compiler;
   private cppCompiler: Compiler;
 
-  private constructor(mach: Mach, srcdir: Path, environment: MachEnvironment, cCompiler: Compiler, cppCompiler: Compiler) {
+  private constructor(mach: Mach, srcdir: FilePath, environment: MachEnvironment, cCompiler: Compiler, cppCompiler: Compiler) {
     super(mach, srcdir);
     this.environment = environment;
     this.cCompiler = cCompiler;
@@ -191,10 +190,10 @@ class RecursiveMakeBuild extends Build {
     return state;
   }
 
-  public static async build(mach: Mach, srcdir: Path, environment: MachEnvironment): Promise<Build|undefined> {
+  public static async build(mach: Mach, srcdir: FilePath, environment: MachEnvironment): Promise<Build|undefined> {
     let config: Map<string, string> = new Map();
 
-    let baseConfig: Path = Path.fromPath(path.join(environment.topobjdir, 'config', 'autoconf.mk'));
+    let baseConfig: FilePath = FilePath.fromPath(path.join(environment.topobjdir, 'config', 'autoconf.mk'));
     await parseConfig(baseConfig, config);
 
     let cPath: string|undefined = config.get('_CC');
@@ -211,8 +210,8 @@ class RecursiveMakeBuild extends Build {
 
     try {
       return new RecursiveMakeBuild(mach, srcdir, environment,
-        await Compiler.create(srcdir, [Path.fromPath(cPath)], FileType.C, config),
-        await Compiler.create(srcdir, [Path.fromPath(cppPath)], FileType.CPP, config),
+        await Compiler.create(srcdir, [FilePath.fromPath(cPath)], FileType.C, config),
+        await Compiler.create(srcdir, [FilePath.fromPath(cppPath)], FileType.CPP, config),
       );
     } catch (e) {
       log.error('Failed to find compilers.', e);
@@ -220,15 +219,15 @@ class RecursiveMakeBuild extends Build {
     }
   }
 
-  public getObjDir(): Path {
-    return Path.fromPath(this.environment.topobjdir);
+  public getObjDir(): FilePath {
+    return FilePath.fromPath(this.environment.topobjdir);
   }
 
-  public getIncludePaths(): Set<string> {
-    let result: Set<string> = new Set();
+  public getIncludePaths(): FilePathSet {
+    let result: FilePathSet = new FilePathSet();
 
-    result.add(this.srcdir.toPath());
-    result.add(this.getObjDir().toPath());
+    result.add(this.srcdir);
+    result.add(this.getObjDir());
 
     for (let path of this.cCompiler.getIncludePaths()) {
       result.add(path);
@@ -241,9 +240,9 @@ class RecursiveMakeBuild extends Build {
     return result;
   }
 
-  public async getSourceConfiguration(source: Path): Promise<CompileConfig|undefined> {
+  public async getSourceConfiguration(source: FilePath): Promise<CompileConfig|undefined> {
     let type: string = source.extname();
-    let backend: Path = source.parent().rebase(this.srcdir, this.getObjDir()).join('backend.mk');
+    let backend: FilePath = source.parent().rebase(this.srcdir, this.getObjDir()).join('backend.mk');
     let dirConfig: Map<string, string> = new Map();
     await parseConfig(backend, dirConfig);
 

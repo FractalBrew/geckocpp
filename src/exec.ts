@@ -9,7 +9,7 @@ import * as vscode from 'vscode';
 
 import { log } from './logging';
 import { config } from './config';
-import { Path } from './shared';
+import { FilePath } from './shared';
 
 export interface ProcessResult {
   code: number;
@@ -28,10 +28,10 @@ export class ProcessError extends Error {
   }
 }
 
-export type CmdArgs = (string|Path)[];
-type Exec = (args: CmdArgs, cwd?: Path, env?: NodeJS.ProcessEnv) => Promise<ProcessResult>;
+export type CmdArgs = (string|FilePath)[];
+type Exec = (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv) => Promise<ProcessResult>;
 
-function baseExec(command: string, args: string[], cwd?: Path, env?: NodeJS.ProcessEnv): Promise<ProcessResult> {
+function baseExec(command: string, args: string[], cwd?: FilePath, env?: NodeJS.ProcessEnv): Promise<ProcessResult> {
   log.debug(`Executing '${command} ${args.join(' ')}'`);
   return new Promise((resolve, reject) => {
     let output: ProcessResult = {
@@ -72,9 +72,9 @@ function baseExec(command: string, args: string[], cwd?: Path, env?: NodeJS.Proc
   });
 }
 
-let spawnExec: Exec = (args: CmdArgs, cwd?: Path, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
-  function convertArg(arg: string|Path): string {
-    if (arg instanceof Path) {
+let spawnExec: Exec = (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
+  function convertArg(arg: string|FilePath): string {
+    if (arg instanceof FilePath) {
       return arg.toPath();
     }
 
@@ -90,14 +90,14 @@ let spawnExec: Exec = (args: CmdArgs, cwd?: Path, env?: NodeJS.ProcessEnv): Prom
   throw new ProcessError('Invalid arguments passed to SpawnExec (no command).');
 };
 
-let mozillaBuildExec: Exec = async (args: CmdArgs, cwd?: Path, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
-  function convertFile(path: Path): string {
+let mozillaBuildExec: Exec = async (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
+  function convertFile(path: FilePath): string {
     // TODO convert name.
     return path.toPath();
   }
 
-  function convertArg(arg: string|Path): string {
-    if (arg instanceof Path) {
+  function convertArg(arg: string|FilePath): string {
+    if (arg instanceof FilePath) {
       return convertFile(arg);
     }
 
@@ -111,7 +111,7 @@ let mozillaBuildExec: Exec = async (args: CmdArgs, cwd?: Path, env?: NodeJS.Proc
     }
   }
 
-  let mozillaBuild: Path = config.getMozillaBuild();
+  let mozillaBuild: FilePath = config.getMozillaBuild();
   env = Object.assign({
     MOZILLABUILD: mozillaBuild.toPath(),
   }, env);
@@ -131,7 +131,7 @@ let mozillaBuildExec: Exec = async (args: CmdArgs, cwd?: Path, env?: NodeJS.Proc
   }
 };
 
-export let exec: Exec = (args: CmdArgs, cwd?: Path, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
+export let exec: Exec = (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
   let internal: Exec = process.platform === 'win32' ? mozillaBuildExec : spawnExec;
   return internal(args, cwd, env);
 };

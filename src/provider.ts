@@ -8,7 +8,7 @@ import * as vscode from 'vscode';
 import { SourceFolder } from './folders';
 import { Workspace } from './workspace';
 import { logItem, log } from './logging';
-import { Disposable } from './shared';
+import { Disposable, FilePathSet } from './shared';
 import { config } from './config';
 
 export class MachConfigurationProvider implements cpptools.CustomConfigurationProvider, Disposable {
@@ -133,7 +133,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
     try {
       let folders: SourceFolder[] = await this.workspace.getMozillaFolders();
 
-      let browsePath: Set<string> = new Set();
+      let browsePath: FilePathSet = new FilePathSet();
 
       for (let folder of folders) {
         for (let path of folder.getIncludePaths()) {
@@ -142,7 +142,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
       }
 
       let config: cpptools.WorkspaceBrowseConfiguration = {
-        browsePath: Array.from(browsePath),
+        browsePath: Array.from(browsePath).map((p) => p.toPath()),
       };
 
       log.debug('Returning browse configuration.', config);

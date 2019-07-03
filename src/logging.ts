@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 
 import { Level, config } from './config';
-import { Path, Disposable, StateProvider } from './shared';
+import { FilePath, Disposable, StateProvider } from './shared';
 
 type LogItemGetter = () => any;
 
@@ -57,7 +57,7 @@ function intoPrimitive(value: any): any {
     return value.toString();
   }
 
-  if (value instanceof Path) {
+  if (value instanceof FilePath) {
     return value.toPath();
   }
 

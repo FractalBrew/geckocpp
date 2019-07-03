@@ -18,7 +18,74 @@ export interface StateProvider {
   toState(): Promise<any>;
 }
 
-export class Path {
+abstract class TranslatedSet<B, R> {
+  private set: Set<B>;
+  private intoB: (item: R) => B;
+  private intoR: (base: B) => R;
+
+  protected constructor(intoB: (item: R) => B, intoR: (base: B) => R, from?: Iterable<R>) {
+    this.intoB = intoB;
+    this.intoR = intoR;
+
+    this.set = new Set();
+
+    if (from) {
+      for (let path of from) {
+        this.set.add(this.intoB(path));
+      }
+    }
+  }
+
+  public [Symbol.iterator](): Iterator<R> {
+    return this.values();
+  }
+
+  public get size(): number {
+    return this.set.size;
+  }
+
+  public add(item: R): this {
+    this.set.add(this.intoB(item));
+    return this;
+  }
+
+  public clear(): void {
+    this.set.clear();
+  }
+
+  public delete(item: R): boolean {
+    return this.set.delete(this.intoB(item));
+  }
+
+  public has(item: R): boolean {
+    return this.set.has(this.intoB(item));
+  }
+
+  public *entries(): IterableIterator<[R, R]> {
+    for (let item of this.values()) {
+      yield [item, item];
+    }
+  }
+
+  public keys(): IterableIterator<R> {
+    return this.values();
+  }
+
+  public *values(): IterableIterator<R> {
+    for (let base of this.set) {
+      yield this.intoR(base);
+    }
+  }
+
+  public forEach(callback: (value: R, key: R, set: this) => any, thisArg?: any): void {
+    this.set.forEach((base: B) => {
+      let item: R = this.intoR(base);
+      callback.call(thisArg, item, item, this);
+    });
+  }
+}
+
+export class FilePath {
   private path: string;
 
   private constructor(str: string) {
@@ -29,15 +96,15 @@ export class Path {
     this.path = str;
   }
 
-  public static fromPath(path: string): Path {
-    return new Path(path);
+  public static fromPath(path: string): FilePath {
+    return new FilePath(path);
   }
 
-  public static fromUri(uri: vscode.Uri): Path {
+  public static fromUri(uri: vscode.Uri): FilePath {
     if (uri.scheme !== 'file') {
       throw new Error(`Attempted to convert a non-file uri to a local path: ${uri}`);
     }
-    return new Path(uri.fsPath);
+    return FilePath.fromPath(uri.fsPath);
   }
 
   public toPath(): string {
@@ -52,17 +119,17 @@ export class Path {
     return path.extname(this.toPath());
   }
 
-  public parent(): Path {
-    return Path.fromPath(path.dirname(this.toPath()));
+  public parent(): FilePath {
+    return FilePath.fromPath(path.dirname(this.toPath()));
   }
 
-  public join(...args: string[]): Path {
-    return Path.fromPath(path.join(this.toPath(), ...args));
+  public join(...args: string[]): FilePath {
+    return FilePath.fromPath(path.join(this.toPath(), ...args));
   }
 
-  public rebase(from: Path, to: Path): Path {
+  public rebase(from: FilePath, to: FilePath): FilePath {
     let rel: string = path.relative(from.toPath(), this.toPath());
-    return new Path(path.join(to.toPath(), rel));
+    return new FilePath(path.join(to.toPath(), rel));
   }
 
   public async stat(): Promise<Stats> {
@@ -71,6 +138,16 @@ export class Path {
 
   public toString(): string {
     return this.toPath();
+  }
+}
+
+export class FilePathSet extends TranslatedSet<string, FilePath> {
+  public constructor(from?: Iterable<FilePath>) {
+    super(
+      (path: FilePath): string => path.toPath(),
+      (str: string): FilePath => FilePath.fromPath(str),
+      from
+    );
   }
 }
 
