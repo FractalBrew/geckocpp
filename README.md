@@ -82,6 +82,8 @@ paste the JSON that has been displayed.
   arguments is not currently supported.
 * `mozillacpp.mach.env` sets environment variables to use when running `mach`.
   These are merged with the existing process environment.
+* `mozillacpp.mozillabuild` sets the path to the [MozillaBuild](https://wiki.mozilla.org/MozillaBuild)
+  install. Defaults to `C:\mozilla-build`.
 * `mozillacpp.log.level` sets the log level that will show up in the Output
   panel.
 * `mozillacpp.log.show_level` sets a log level that will cause the Output panel
