@@ -91,7 +91,7 @@ export abstract class Build implements Disposable, StateProvider {
   }
 
   public async toState(): Promise<any> {
-    return { mach: this.mach.toState() };
+    return { mach: await this.mach.toState() };
   }
 
   public static async create(root: vscode.Uri): Promise<Build|undefined> {

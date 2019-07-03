@@ -7,6 +7,13 @@ import * as vscode from 'vscode';
 import { Level, config } from './config';
 import { Disposable, StateProvider } from './shared';
 
+function isUri(obj: any): obj is vscode.Uri {
+  if (typeof obj === 'object') {
+    return "$mid" in obj;
+  }
+  return false;
+}
+
 type LogItemGetter = () => any;
 
 class LogItem {
@@ -54,6 +61,13 @@ function serialize(value: any): string {
   }
 
   if (value instanceof Error) {
+    return value.toString();
+  }
+
+  if (isUri(value)) {
+    if (value.scheme === 'file') {
+      return value.fsPath;
+    }
     return value.toString();
   }
 
@@ -107,11 +121,14 @@ class Logger implements Disposable {
     return level >= config.getLogLevel();
   }
 
-  private writeOutput(str: string): void {
+  private writeOutput(str: string, show: boolean): void {
     if (!this.channel) {
       this.channel = vscode.window.createOutputChannel(this.name);
     }
     this.channel.appendLine(str);
+    if (show) {
+      this.channel.show(true);
+    }
   }
 
   private output(level: Level, ...args: any[]): void {
@@ -135,20 +152,19 @@ class Logger implements Disposable {
       return;
     }
 
-    this.writeOutput(`${levelstr}: ${args.map(serialize).join(' ')}`);
-
-    if (this.shouldOpen(level) && this.channel) {
-      this.channel.show(true);
-    }
+    this.writeOutput(`${levelstr}: ${args.map(serialize).join(' ')}`, this.shouldOpen(level));
   }
 
   public async dumpState(obj: StateProvider): Promise<void> {
-    let str: string = JSON.stringify(await obj.toState(), undefined, 2);
-    this.writeOutput(str);
-
-    if (this.channel) {
-      this.channel.show(true);
-    }
+    let state: any = await obj.toState();
+    console.log('Current state', state);
+    let str: string = JSON.stringify(state, (_key, value) => {
+      if (isUri(value)) {
+        return value.fsPath;
+      }
+      return value;
+    }, 2);
+    this.writeOutput(`Mozilla intellisense state: ${str}`, true);
   }
 
   public debug(...args: any[]): void {

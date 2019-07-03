@@ -130,6 +130,7 @@ export abstract class Compiler implements Disposable, StateProvider {
 
   public async toState(): Promise<any> {
     return {
+      command: this.getCommand(),
       includes: this.defaults.includes.size,
       defines: this.defaults.defines.size,
     };
@@ -152,6 +153,10 @@ export abstract class Compiler implements Disposable, StateProvider {
     }
   }
 
+  protected getCommand(): CmdArgs {
+    return [this.path];
+  }
+
   public getDefaultConfiguration(): CompileConfig {
     return cloneConfig(this.defaults);
   }
@@ -164,11 +169,8 @@ export abstract class Compiler implements Disposable, StateProvider {
 }
 
 class ClangCompiler extends Compiler {
-  private sdk: string|undefined;
-
-  private constructor(path: vscode.Uri, type: FileType, defaults: CompileConfig, sdk: string|undefined) {
+  private constructor(path: vscode.Uri, type: FileType, defaults: CompileConfig) {
     super(path, type, defaults);
-    this.sdk = sdk;
   }
 
   public dispose(): void {
@@ -252,7 +254,7 @@ class ClangCompiler extends Compiler {
         throw new Error('Compiler returned empty includes or defined.');
       }
 
-      return new ClangCompiler(path, type, defaults, sdk);
+      return new ClangCompiler(path, type, defaults);
     } catch (e) {
       log.error('Failed to get compiler defaults', e);
       throw e;

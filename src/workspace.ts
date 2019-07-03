@@ -10,7 +10,7 @@ import { log } from './logging';
 import { StateProvider, Disposable } from './shared';
 
 export class Workspace implements StateProvider, Disposable {
-  private machCount: number = 0;
+  private mozillaCount: number = 0;
   private folders: Map<vscode.Uri, Promise<SourceFolder>>;
   private provider: MachConfigurationProvider|null = null;
 
@@ -27,7 +27,7 @@ export class Workspace implements StateProvider, Disposable {
 
   public async toState(): Promise<any> {
     return {
-      machCount: this.machCount,
+      mozillaCount: this.mozillaCount,
       folders: await Promise.all((await Promise.all(this.folders.values())).map((f) => f.toState())),
     };
   }
@@ -50,9 +50,9 @@ export class Workspace implements StateProvider, Disposable {
 
     if (oldFolder.isMozillaSource() !== newFolder.isMozillaSource()) {
       if (oldFolder.isMozillaSource()) {
-        this.machCount--;
+        this.mozillaCount--;
       } else {
-        this.machCount++;
+        this.mozillaCount++;
       }
     }
   }
@@ -60,7 +60,7 @@ export class Workspace implements StateProvider, Disposable {
   public async rebuildFolders(folders: SourceFolder[]): Promise<void> {
     await Promise.all(folders.map((f) => this.rebuildFolder(f)));
 
-    if (this.machCount > 0 && !this.provider) {
+    if (this.mozillaCount > 0 && !this.provider) {
       this.provider = await MachConfigurationProvider.create(this);
     } else {
       this.resetBrowseConfiguration();
@@ -74,9 +74,9 @@ export class Workspace implements StateProvider, Disposable {
     let folder: SourceFolder = await promise;
 
     if (folder.isMozillaSource()) {
-      this.machCount++;
+      this.mozillaCount++;
 
-      if (this.machCount === 1) {
+      if (this.mozillaCount === 1) {
         this.provider = await MachConfigurationProvider.create(this);
       } else {
         this.resetConfiguration();
@@ -95,7 +95,7 @@ export class Workspace implements StateProvider, Disposable {
     this.folders.delete(wFolder.uri);
     let folder: SourceFolder = await promise;
     if (folder.isMozillaSource()) {
-      this.machCount--;
+      this.mozillaCount--;
 
       this.resetConfiguration();
       this.resetBrowseConfiguration();
@@ -124,7 +124,7 @@ export class Workspace implements StateProvider, Disposable {
   }
 
   public async canProvideConfig(): Promise<boolean> {
-    return this.machCount > 0;
+    return this.mozillaCount > 0;
   }
 
   public resetConfiguration(): void {

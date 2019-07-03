@@ -8,6 +8,7 @@
           ["class",                 "pascal"],
           ["interface",             "pascal"],
           ["variable", "const",     "upper"],
+          ["parameter",             "camel", "allow-leading-underscore"],
           ["default",               "camel"]
         ],
         "file-header": [true, ".*"],
