@@ -7,13 +7,54 @@ import * as vscode from 'vscode';
 import { Level, config } from './config';
 import { Disposable, StateProvider } from './shared';
 
+type LogItemGetter = () => any;
+
+class LogItem {
+  private getter: LogItemGetter;
+  private actual: any|undefined;
+  private got: any|undefined;
+
+  public constructor(getter: LogItemGetter, actual?: any) {
+    this.getter = getter;
+    this.actual = actual;
+  }
+
+  public getForOutput(): any {
+    if (this.got) {
+      return this.got;
+    }
+
+    return this.got = this.getter();
+  }
+
+  public getForConsole(): any {
+    if (this.actual) {
+      return this.actual;
+    }
+
+    return this.getForOutput();
+  }
+}
+
+export function logItem(getter: LogItemGetter, actual?: any): LogItem {
+  return new LogItem(getter, actual);
+}
+
 function serialize(value: any): string {
+  if (value instanceof LogItem) {
+    value = value.getForOutput();
+  }
+
   if (value === null) {
     return '<null>';
   }
 
   if (Array.isArray(value)) {
     return JSON.stringify(value);
+  }
+
+  if (value instanceof Error) {
+    return value.toString();
   }
 
   switch (typeof value) {
@@ -40,13 +81,13 @@ function serialize(value: any): string {
 
       return `function ${value.name}(${args}) {}`;
     default:
-      return JSON.stringify(value);
+      return JSON.stringify(value, null, '  ');
   }
 }
 
 class Logger implements Disposable {
-  name: string;
-  channel?: vscode.OutputChannel;
+  private name: string;
+  private channel?: vscode.OutputChannel;
 
   public constructor(name: string) {
     this.name = name;
@@ -76,15 +117,17 @@ class Logger implements Disposable {
   private output(level: Level, ...args: any[]): void {
     let levelstr: string = Level[level];
 
+    let consoleArgs: any[] = args.map((a) => a instanceof LogItem ? a.getForConsole() : a);
+
     switch (level) {
       case Level.Warn:
-        console.warn(`mozillacpp ${levelstr}:`, ...args);
+        console.warn(`mozillacpp ${levelstr}:`, ...consoleArgs);
         break;
       case Level.Error:
-        console.error(`mozillacpp ${levelstr}:`, ...args);
+        console.error(`mozillacpp ${levelstr}:`, ...consoleArgs);
         break;
       default:
-        console.log(`mozillacpp ${levelstr}:`, ...args);
+        console.log(`mozillacpp ${levelstr}:`, ...consoleArgs);
         break;
     }
 

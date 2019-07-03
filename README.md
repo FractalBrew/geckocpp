@@ -7,27 +7,33 @@
 
 With generated headers, external build directories and a non-standard build
 configuration it is near impossible for standard tools to understand Mozilla's
-build graph.
+build graph. This Visual Studio Code extension provides the additional knowledge
+needed. It is built as an extension to the official [C/C++ extension for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools).
 
-This Visual Studio Code extension provides the additional knowledge needed. It
-is built as an extension to the official [C/C++ extension for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools).
+It works by generating a list of include paths and defines for any C/C++ file
+you open and then letting the C/C++ extension do the hard work of parsing and
+generating errors and intellisense data for the editor based on that
+information.
 
 This extension should be considered an early release, please [file issues](https://github.com/FractalBrew/vscode-mozillacpp/issues/new)
 where Visual Studio Code doesn't understand your code as you find them.
 
+This extension has only been tested with builds that use the clang compiler.
+
 ## Requirements
 
 1. [The C/C++ extension for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools).
-2. You need to be compiling with clang (or something that behaves the same).
+2. That's about it.
 
 ## Usage
 
 Once installed and configured you should be seeing potential issues in your code
-where symbols can't be resolved.
+where symbols can't be resolved, code-completion popups and the ability to
+hover over code to see definitions.
 
 Since many necessary headers are generated at build time and the build config
 is only updated at build time, intellisense data will not work unless you have
-built your tree since any applicable changes. For example errors may appear if
+built your tree since any applicable changes. For example issues may appear if
 you have modified a `moz.build` or `.idl` file since the last build. In the
 future this extension will try to detect this and warn you that there is an
 issue.

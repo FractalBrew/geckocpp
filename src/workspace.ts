@@ -10,9 +10,9 @@ import { log } from './logging';
 import { StateProvider, Disposable } from './shared';
 
 export class Workspace implements StateProvider, Disposable {
-  machCount: number = 0;
-  folders: Map<vscode.Uri, Promise<SourceFolder>>;
-  provider: MachConfigurationProvider|null = null;
+  private machCount: number = 0;
+  private folders: Map<vscode.Uri, Promise<SourceFolder>>;
+  private provider: MachConfigurationProvider|null = null;
 
   public constructor() {
     this.folders = new Map();
@@ -48,8 +48,8 @@ export class Workspace implements StateProvider, Disposable {
     this.folders.set(oldFolder.root, promise);
     let newFolder: SourceFolder = await promise;
 
-    if (oldFolder.hasMach() !== newFolder.hasMach()) {
-      if (oldFolder.hasMach()) {
+    if (oldFolder.isMozillaSource() !== newFolder.isMozillaSource()) {
+      if (oldFolder.isMozillaSource()) {
         this.machCount--;
       } else {
         this.machCount++;
@@ -73,7 +73,7 @@ export class Workspace implements StateProvider, Disposable {
     this.folders.set(wFolder.uri, promise);
     let folder: SourceFolder = await promise;
 
-    if (folder.hasMach()) {
+    if (folder.isMozillaSource()) {
       this.machCount++;
 
       if (this.machCount === 1) {
@@ -94,7 +94,7 @@ export class Workspace implements StateProvider, Disposable {
 
     this.folders.delete(wFolder.uri);
     let folder: SourceFolder = await promise;
-    if (folder.hasMach()) {
+    if (folder.isMozillaSource()) {
       this.machCount--;
 
       this.resetConfiguration();
@@ -119,8 +119,8 @@ export class Workspace implements StateProvider, Disposable {
     return Promise.all(this.folders.values());
   }
 
-  public async getMachFolders(): Promise<SourceFolder[]> {
-    return (await Promise.all(this.folders.values())).filter((f) => f.hasMach());
+  public async getMozillaFolders(): Promise<SourceFolder[]> {
+    return (await Promise.all(this.folders.values())).filter((f) => f.isMozillaSource());
   }
 
   public async canProvideConfig(): Promise<boolean> {

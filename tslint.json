@@ -33,6 +33,7 @@
           "object-destructuring",
           "array-destructuring"
         ],
+        "member-access": [true, "check-accessor", "check-constructor", "check-parameter-property"],
         "whitespace": [true, "check-branch", "check-operator", "check-separator", "check-preblock", "check-type"]
     },
     "rulesDirectory": [

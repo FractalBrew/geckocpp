@@ -5,18 +5,18 @@
 import * as cpptools from 'vscode-cpptools';
 import * as vscode from 'vscode';
 
-import { SourceFolder, ProcessResult } from './folders';
+import { SourceFolder } from './folders';
 import { Workspace } from './workspace';
-import { log } from './logging';
-import { parseConfigFromCmdLine, CompilerInfo, Disposable } from './shared';
+import { logItem, log } from './logging';
+import { Disposable } from './shared';
 import { config } from './config';
 
 export class MachConfigurationProvider implements cpptools.CustomConfigurationProvider, Disposable {
-  api: cpptools.CppToolsApi;
-  workspace: Workspace;
+  private api: cpptools.CppToolsApi;
+  private workspace: Workspace;
 
-  name: string = 'Mozilla';
-  extensionId: string = 'fractalbrew.mozillacpp';
+  public name: string = 'Mozilla';
+  public extensionId: string = 'fractalbrew.mozillacpp';
 
   public static async create(workspace: Workspace): Promise<MachConfigurationProvider|null> {
     let api: cpptools.CppToolsApi|undefined = await cpptools.getCppToolsApi(cpptools.Version.v2);
@@ -57,30 +57,13 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
     this.api.didChangeCustomBrowseConfiguration(this);
   }
 
-  async canProvideConfiguration(uri: vscode.Uri): Promise<boolean> {
+  public async canProvideConfiguration(uri: vscode.Uri): Promise<boolean> {
     try {
       let folder: SourceFolder|undefined = await this.workspace.getFolder(uri);
-      return folder !== undefined && folder.canProvideConfig();
+      return folder !== undefined && folder.isMozillaSource();
     } catch (e) {
       log.error('Failed to canProvildeConfiguration.', e);
       return false;
-    }
-  }
-
-  private async getConfiguration(folder: SourceFolder, compilerInfo: CompilerInfo, path: string): Promise<cpptools.SourceFileConfiguration|undefined> {
-    try {
-      let output: ProcessResult = await folder.mach(['compileflags', path]);
-      try {
-        return parseConfigFromCmdLine(compilerInfo, output.stdout);
-      } catch (e) {
-        log.error('Failed to parse command line.', e);
-        return undefined;
-      }
-    } catch (e) {
-      if (e.result.stdout.trim() === 'Your tree has not been built yet. Please run |mach build| with no arguments.') {
-        this.showError('You must compile before Mozilla Intellisense will work.');
-      }
-      return undefined;
     }
   }
 
@@ -88,18 +71,30 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
     let results: (undefined|cpptools.SourceFileConfigurationItem)[] = await Promise.all(uris.map(async (uri) => {
       try {
         let folder: SourceFolder|undefined = await this.workspace.getFolder(uri);
-        if (!folder || !await folder.canProvideConfig()) {
+        if (!folder || !await folder.isMozillaSource()) {
+          log.debug(`Asked for a configuration for a non-Mozilla file: ${uri.fsPath}`);
           return undefined;
         }
 
-        let config: cpptools.SourceFileConfiguration|undefined = await folder.getCachedConfiguration(uri, this.getConfiguration.bind(this));
-
+        let config: cpptools.SourceFileConfiguration|undefined = await folder.getSourceConfiguration(uri);
         if (config === undefined) {
           log.debug(`Unable to find configuration for ${uri.fsPath}.`);
-          return config;
+          return undefined;
         }
 
-        log.debug(`Returning configuration for ${uri.fsPath}.`, config);
+        // Silly TypeScript!
+        let realConfig: cpptools.SourceFileConfiguration = config;
+        log.debug(`Returning configuration for ${uri.fsPath}.`, logItem(() => {
+          return {
+            includePath: realConfig.includePath,
+            defines: `${realConfig.defines.length} defines`,
+            intelliSenseMode: realConfig.intelliSenseMode,
+            standard: realConfig.standard,
+            forcedInclude: realConfig.forcedInclude,
+            compilerPath: realConfig.compilerPath,
+            windowsSdkVersion: realConfig.windowsSdkVersion,
+          };
+        }, config));
 
         return {
           uri: uri,
@@ -136,21 +131,18 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
     }
 
     try {
-      let folders: SourceFolder[] = await this.workspace.getMachFolders();
+      let folders: SourceFolder[] = await this.workspace.getMozillaFolders();
 
-      let browsePath: Set<string> = new Set();
+      let browsePath: Set<vscode.Uri> = new Set();
 
       for (let folder of folders) {
         for (let path of folder.getIncludePaths()) {
           browsePath.add(path);
         }
-
-        browsePath.add(folder.getTopSrcDir());
-        browsePath.add(folder.getTopObjDir());
       }
 
       let config: cpptools.WorkspaceBrowseConfiguration = {
-        browsePath: Array.from(browsePath),
+        browsePath: Array.from(browsePath).map((u) => u.fsPath),
       };
 
       log.debug('Returning browse configuration.', config);

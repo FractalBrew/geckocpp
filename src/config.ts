@@ -44,23 +44,23 @@ function levelFromStr(name: string|undefined, normal: Level): Level {
 }
 
 class Configuration implements StateProvider, Disposable {
-  listener: vscode.Disposable;
-  logLevel: Level = DEFAULT_LOG_LEVEL;
-  showLogLevel: Level = DEFAULT_LOG_SHOW_LEVEL;
+  private listener: vscode.Disposable;
+  private logLevel: Level = DEFAULT_LOG_LEVEL;
+  private showLogLevel: Level = DEFAULT_LOG_SHOW_LEVEL;
 
-  constructor() {
+  public constructor() {
     this.listener = vscode.workspace.onDidChangeConfiguration((e) => this.onConfigChange(e));
     this.fetchLogConfig();
   }
 
-  async toState(): Promise<any> {
+  public async toState(): Promise<any> {
     return {
       logLevel: this.logLevel,
       showLogLevel: this.showLogLevel,
     };
   }
 
-  dispose(): void {
+  public dispose(): void {
     this.listener.dispose();
   }
 
@@ -102,20 +102,28 @@ class Configuration implements StateProvider, Disposable {
     }
   }
 
-  public getCompiler(folder: vscode.Uri, extension: string): string|undefined {
-    return this.getRoot(folder).get(`compiler.${extension}.path`) || undefined;
+  public getCompiler(folder: vscode.Uri, extension: string): vscode.Uri|undefined {
+    let compiler: string|undefined = this.getRoot(folder).get(`compiler.${extension}.path`);
+    if (compiler) {
+      return vscode.Uri.file(compiler);
+    }
+    return undefined;
   }
 
-  public getMach(folder: vscode.Uri): string|undefined {
-    return this.getRoot(folder).get('mach.path') || undefined;
+  public getMach(folder: vscode.Uri): vscode.Uri|undefined {
+    let mach: string|undefined = this.getRoot(folder).get('mach.path');
+    if (mach) {
+      return vscode.Uri.file(mach);
+    }
+    return undefined;
   }
 
   public getMachEnvironment(folder: vscode.Uri): NodeJS.ProcessEnv {
     return Object.assign({}, this.getRoot(folder).get('mach.environment') || {}, process.env);
   }
 
-  public getMozillaBuild(): string|undefined {
-    return this.getRoot().get('mozillabuild') || 'C:\\mozilla-build';
+  public getMozillaBuild(): vscode.Uri {
+    return vscode.Uri.file(this.getRoot().get('mozillabuild') || 'C:\\mozilla-build');
   }
 
   public getLogLevel(): Level {
