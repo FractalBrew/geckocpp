@@ -95,12 +95,6 @@
           "description": "The path to MozillaBuild on Windows. Defaults to 'C:\\mozilla-build'",
           "scope": "machine"
         },
-        "mozillacpp.tag.disable": {
-          "type": "boolean",
-          "default": false,
-          "description": "Disables the C++ tag parser.",
-          "scope": "window"
-        },
         "mozillacpp.log.level": {
           "type": "string",
           "enum": [

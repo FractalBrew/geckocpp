@@ -68,7 +68,9 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
   }
 
   public async provideConfigurations(uris: vscode.Uri[]): Promise<cpptools.SourceFileConfigurationItem[]> {
+    let start: number = Date.now();
     let results: (undefined|cpptools.SourceFileConfigurationItem)[] = await Promise.all(uris.map(async (uri) => {
+      log.debug(`Configuration for ${uri} requested`);
       try {
         let folder: SourceFolder|undefined = await this.workspace.getFolder(uri);
         if (!folder || !await folder.isMozillaSource()) {
@@ -110,6 +112,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
       return item !== undefined;
     }
 
+    log.debug(`Returned custom configurations in ${Date.now() - start}ms`);
     return results.filter(hasConfig);
   }
 
@@ -123,13 +126,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
   }
 
   public async provideBrowseConfiguration(): Promise<cpptools.WorkspaceBrowseConfiguration> {
-    if (config.isTagParsingDisable()) {
-      log.debug('Disabling browse path.');
-      return {
-        browsePath: [],
-      };
-    }
-
+    let start: number = Date.now();
     try {
       let folders: SourceFolder[] = await this.workspace.getMozillaFolders();
 
@@ -145,7 +142,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
         browsePath: Array.from(browsePath).map((p) => p.toPath()),
       };
 
-      log.debug('Returning browse configuration.', config);
+      log.debug(`Returned browse configuration in ${Date.now() - start}ms`, config);
       return config;
     } catch (e) {
       log.error('Failed to provideBrowseConfiguration.', e);

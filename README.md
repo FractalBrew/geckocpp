@@ -88,7 +88,3 @@ paste the JSON that has been displayed.
   panel.
 * `mozillacpp.log.show_level` sets a log level that will cause the Output panel
   to appear.
-* `mozillacpp.tag.disable` disables the C++ tag parser. The tag parser chews up
-  a lot of CPU cycles and provides less accurate results, but it is more
-  reliable than intellisense and so will give results when intellisense fails.
-  This setting is experimental.

@@ -102,10 +102,6 @@ class Configuration implements StateProvider, Disposable {
       this.fetchLogConfig();
     }
 
-    if (event.affectsConfiguration('mozillacpp.tag')) {
-      workspace.resetBrowseConfiguration();
-    }
-
     let folders: SourceFolder[] = await workspace.getAllFolders();
     let rebuilds: SourceFolder[] = [];
     for (let folder of folders) {
@@ -156,10 +152,6 @@ class Configuration implements StateProvider, Disposable {
 
   public getLogShowLevel(): Level {
     return this.showLogLevel;
-  }
-
-  public isTagParsingDisable(): boolean {
-    return this.getRoot().get('tag.disabled') || false;
   }
 }
 
