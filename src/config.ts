@@ -8,9 +8,11 @@ import * as vscode from 'vscode';
 
 import { SourceFolder } from './folders';
 import { workspace } from './workspace';
-import { FilePath, StateProvider, Disposable, splitCmdLine } from './shared';
+import { FilePath, StateProvider, Disposable } from './shared';
 import { CmdArgs } from './exec';
 import { FileType } from './compiler';
+import { log } from './logging';
+import { shellParse } from './shell';
 
 export enum Level {
   Always = 0,
@@ -34,14 +36,18 @@ async function asCmdArgs(cmdLine: string): Promise<CmdArgs> {
     }
   }
 
-  async function fixup(arg: string): Promise<string|FilePath> {
+  async function fixup(arg: FilePath|string): Promise<string|FilePath> {
+    if (arg instanceof FilePath) {
+      return arg;
+    }
+
     if (await isPath(arg)) {
       return FilePath.fromPath(arg);
     }
     return arg;
   }
 
-  return Promise.all(splitCmdLine(cmdLine).map(fixup));
+  return Promise.all(shellParse(cmdLine).map(fixup));
 }
 
 function levelFromStr(name: string|undefined, normal: Level): Level {

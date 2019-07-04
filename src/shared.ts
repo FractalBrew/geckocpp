@@ -7,9 +7,6 @@ import { promises as fs, Stats } from 'fs';
 
 import * as vscode from 'vscode';
 
-import { Options } from 'split-string';
-let split: (str: string, options: Options) => string[] = require('split-string');
-
 export interface Disposable {
   dispose(): void;
 }
@@ -107,12 +104,30 @@ export class FilePath {
     return FilePath.fromPath(uri.fsPath);
   }
 
+  public static fromUnixy(path: string): FilePath {
+    if (process.platform === 'win32') {
+      return FilePath.fromPath(path.replace(/\//g, '\\'));
+    }
+    return FilePath.fromPath(path);
+  }
+
+  public equals(other: FilePath): boolean {
+    return this.path === other.path;
+  }
+
+  public toUnixy(): string {
+    if (process.platform === 'win32') {
+      return this.toPath().replace(/\\/g, '/');
+    }
+    return this.toPath();
+  }
+
   public toPath(): string {
     return this.path;
   }
 
   public toUri(): vscode.Uri {
-    return vscode.Uri.file(this.path);
+    return vscode.Uri.file(this.toPath());
   }
 
   public extname(): string {
@@ -149,24 +164,6 @@ export class FilePathSet extends TranslatedSet<string, FilePath> {
       from
     );
   }
-}
-
-export function splitCmdLine(cmdline: string): string[] {
-  return split(cmdline.trim(), {
-    quotes: true,
-    separator: ' ',
-  }).map((s: string): string => {
-    if (s.length < 2) {
-      return s;
-    }
-
-    if ((s.startsWith('\'') && s.endsWith('\'')) ||
-        (s.startsWith('"') && s.endsWith('"'))) {
-      return s.substring(1, s.length - 1);
-    }
-
-    return s;
-  });
 }
 
 export function into(json: any, template: any): any {

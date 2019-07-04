@@ -3,13 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { ChildProcess, spawn } from 'child_process';
-import * as path from 'path';
-
-import * as vscode from 'vscode';
 
 import { log } from './logging';
 import { config } from './config';
 import { FilePath } from './shared';
+import { shellQuote } from './shell';
 
 export interface ProcessResult {
   code: number;
@@ -91,19 +89,6 @@ let spawnExec: Exec = (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv): 
 };
 
 let mozillaBuildExec: Exec = async (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
-  function convertFile(path: FilePath): string {
-    // TODO convert name.
-    return path.toPath();
-  }
-
-  function convertArg(arg: string|FilePath): string {
-    if (arg instanceof FilePath) {
-      return convertFile(arg);
-    }
-
-    return arg;
-  }
-
   function fixOutput(result: ProcessResult): void {
     if (result.stdout.startsWith('MozillaBuild Install Directory:')) {
       let pos: number = result.stdout.indexOf('\n');
@@ -113,16 +98,14 @@ let mozillaBuildExec: Exec = async (args: CmdArgs, cwd?: FilePath, env?: NodeJS.
 
   let mozillaBuild: FilePath = config.getMozillaBuild();
   env = Object.assign({
-    MOZILLABUILD: mozillaBuild.toPath(),
+    MOZILLABUILD: mozillaBuild.toPath() + '\\',
   }, env);
 
-  // TODO this is wrong.
-  let cmdArgs: string[] = args.map(convertArg);
-  cmdArgs.unshift('--login', '-i', '-c');
+  let shellCmd: string = shellQuote(args, (path) => path.toUnixy());
   let command: string = mozillaBuild.join('msys', 'bin', 'bash.exe').toPath();
 
   try {
-    let result: ProcessResult = await baseExec(command, cmdArgs, cwd, env);
+    let result: ProcessResult = await baseExec(command, ['--login', '-i', '-c', shellCmd], cwd, env);
     fixOutput(result);
     return result;
   } catch (e) {

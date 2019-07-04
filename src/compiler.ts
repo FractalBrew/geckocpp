@@ -4,8 +4,9 @@
 
 import { ProcessResult, exec, CmdArgs } from './exec';
 import { log } from './logging';
-import { FilePath, Disposable, StateProvider, splitCmdLine, FilePathSet } from './shared';
+import { FilePath, Disposable, StateProvider, FilePathSet } from './shared';
 import { config } from './config';
+import { shellParse } from './shell';
 
 type VERSIONS = 'c89' | 'c99' | 'c11' | 'c++98' | 'c++03' | 'c++11' | 'c++14' | 'c++17';
 type INTELLISENSE_MODES = 'msvc-x64' | 'gcc-x64' | 'clang-x64';
@@ -65,9 +66,13 @@ function addCompilerArgumentsToConfig(cmdLine: string|undefined, forceIncludeArg
     return;
   }
 
-  let args: string[] = splitCmdLine(cmdLine);
-  let arg: string|undefined;
+  let args: CmdArgs = shellParse(cmdLine);
+  let arg: FilePath|string|undefined;
   while (arg = args.shift()) {
+    if (arg instanceof FilePath) {
+      continue;
+    }
+
     if (arg.length < 2 || (arg.charAt(0) !== '-' && arg.charAt(0) !== '/')) {
       continue;
     }
@@ -83,8 +88,8 @@ function addCompilerArgumentsToConfig(cmdLine: string|undefined, forceIncludeArg
     }
 
     if (arg === forceIncludeArg) {
-      let include: string|undefined = args.shift();
-      if (include) {
+      let include: FilePath|string|undefined = args.shift();
+      if (typeof include === 'string') {
         config.forcedIncludes.add(FilePath.fromPath(include));
       }
       continue;

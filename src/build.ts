@@ -22,8 +22,8 @@ interface MozConfig {
 
 interface MachEnvironment {
   mozconfig: MozConfig;
-  topobjdir: string;
-  topsrcdir: string;
+  topobjdir: '';
+  topsrcdir: '';
 }
 
 function intoEnvironment(json: any): MachEnvironment {
@@ -123,7 +123,7 @@ export abstract class Build implements Disposable, StateProvider {
 
     try {
       let environment: MachEnvironment = await mach.getEnvironment();
-      if (environment.topsrcdir !== srcdir.toPath()) {
+      if (!FilePath.fromUnixy(environment.topsrcdir).equals(srcdir)) {
         log.error('Mach environment contained unexpected topsrcdir.');
         return undefined;
       }
@@ -220,7 +220,7 @@ class RecursiveMakeBuild extends Build {
   }
 
   public getObjDir(): FilePath {
-    return FilePath.fromPath(this.environment.topobjdir);
+    return FilePath.fromUnixy(this.environment.topobjdir);
   }
 
   public getIncludePaths(): FilePathSet {

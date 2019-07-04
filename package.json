@@ -30,19 +30,23 @@
     "mach"
   ],
   "icon": "icon.png",
-  "badges": [{
-    "url": "https://img.shields.io/github/issues-raw/fractalbrew/vscode-mozillacpp.svg?style=popout",
-    "href": "https://github.com/FractalBrew/vscode-mozillacpp/issues",
-    "description": "Open issues"
-  }, {
-    "url": "https://img.shields.io/github/issues-raw/fractalbrew/vscode-mozillacpp/blocking.svg?style=popout",
-    "href": "https://github.com/FractalBrew/vscode-mozillacpp/issues?q=is%3Aopen+is%3Aissue+label%3Ablocking",
-    "description": "Blocking issues"
-  }, {
-    "url": "https://img.shields.io/github/issues-pr-raw/fractalbrew/vscode-mozillacpp.svg?style=popout",
-    "href": "https://github.com/FractalBrew/vscode-mozillacpp/pulls",
-    "description": "Open pull requests"
-  }],
+  "badges": [
+    {
+      "url": "https://img.shields.io/github/issues-raw/fractalbrew/vscode-mozillacpp.svg?style=popout",
+      "href": "https://github.com/FractalBrew/vscode-mozillacpp/issues",
+      "description": "Open issues"
+    },
+    {
+      "url": "https://img.shields.io/github/issues-raw/fractalbrew/vscode-mozillacpp/blocking.svg?style=popout",
+      "href": "https://github.com/FractalBrew/vscode-mozillacpp/issues?q=is%3Aopen+is%3Aissue+label%3Ablocking",
+      "description": "Blocking issues"
+    },
+    {
+      "url": "https://img.shields.io/github/issues-pr-raw/fractalbrew/vscode-mozillacpp.svg?style=popout",
+      "href": "https://github.com/FractalBrew/vscode-mozillacpp/pulls",
+      "description": "Open pull requests"
+    }
+  ],
   "extensionDependency": [
     "vscode.cpptools"
   ],
@@ -52,15 +56,18 @@
   ],
   "main": "./out/main.js",
   "contributes": {
-    "commands": [{
-      "command": "mozillacpp.resetIntellisense",
-      "title": "Reset Intellisense",
-      "category": "Mozilla"
-    }, {
-      "command": "mozillacpp.dumpState",
-      "title": "Dump internal state",
-      "category": "Mozilla"
-    }],
+    "commands": [
+      {
+        "command": "mozillacpp.resetIntellisense",
+        "title": "Reset Intellisense",
+        "category": "Mozilla"
+      },
+      {
+        "command": "mozillacpp.dumpState",
+        "title": "Dump internal state",
+        "category": "Mozilla"
+      }
+    ],
     "configuration": {
       "type": "object",
       "title": "Mozilla Intellisense",
@@ -133,9 +140,7 @@
     "postinstall": "node ./node_modules/vscode/bin/install",
     "test": "npm run compile && node ./node_modules/vscode/bin/test"
   },
-  "dependencies": {
-    "split-string": "^6.1.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "typescript": "^3.3.2",
     "vscode": "^1.1.28",
@@ -144,6 +149,7 @@
     "tslint-microsoft-contrib": "^6.2.0",
     "@types/node": "^10.11.0",
     "@types/mocha": "^5.2.7",
+    "@types/shell-quote": "^1.6.1",
     "vscode-cpptools": "^2.1.2",
     "vscode-jsonrpc": "3.5.0"
   }
