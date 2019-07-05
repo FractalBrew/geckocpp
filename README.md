@@ -38,6 +38,11 @@ you have modified a `moz.build` or `.idl` file since the last build. In the
 future this extension will try to detect this and warn you that there is an
 issue.
 
+Also note that since Mozilla's build system combines many C++ files together to
+build it is possible for one file to end up depending on definitions or includes
+from another file in the same directory. This cause the file to have errors when
+checked standalone as this extensions does but successfully compile.
+
 ## Known issues
 
 Generally check the [Github issues](https://github.com/FractalBrew/vscode-mozillacpp/issues).
