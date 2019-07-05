@@ -56,18 +56,15 @@
   ],
   "main": "./out/main.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "mozillacpp.resetIntellisense",
-        "title": "Reset Intellisense",
-        "category": "Mozilla"
-      },
-      {
-        "command": "mozillacpp.dumpState",
-        "title": "Dump internal state",
-        "category": "Mozilla"
-      }
-    ],
+    "commands": [{
+      "command": "mozillacpp.resetIntellisense",
+      "title": "Reset Intellisense",
+      "category": "Mozilla"
+    }, {
+      "command": "mozillacpp.dumpState",
+      "title": "Dump internal state",
+      "category": "Mozilla"
+    }],
     "configuration": {
       "type": "object",
       "title": "Mozilla Intellisense",
