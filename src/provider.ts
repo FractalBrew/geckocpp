@@ -9,7 +9,7 @@ import { SourceFolder } from './folders';
 import { Workspace } from './workspace';
 import { logItem, log } from './logging';
 import { Disposable, FilePathSet } from './shared';
-import { config } from './config';
+import { Define, CompileConfig } from './compiler';
 
 export class MachConfigurationProvider implements cpptools.CustomConfigurationProvider, Disposable {
   private api: cpptools.CppToolsApi;
@@ -78,23 +78,35 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
           return undefined;
         }
 
-        let config: cpptools.SourceFileConfiguration|undefined = await folder.getSourceConfiguration(uri);
-        if (config === undefined) {
+        let compileConfig: CompileConfig|undefined = await folder.getSourceConfiguration(uri);
+        if (compileConfig === undefined) {
           log.warn(`Unable to find configuration for ${uri.fsPath}.`);
           return undefined;
         }
 
-        // Silly TypeScript!
-        let realConfig: cpptools.SourceFileConfiguration = config;
+        function outputDefine(define: Define): string {
+          return `${define.key}=${define.value}`;
+        }
+    
+        let config: cpptools.SourceFileConfiguration = {
+          includePath: Array.from(compileConfig.includes).map((p) => p.toPath()),
+          defines: Array.from(compileConfig.defines.values()).map(outputDefine),
+          forcedInclude: Array.from(compileConfig.forcedIncludes).map((p) => p.toPath()),
+          intelliSenseMode: compileConfig.intelliSenseMode,
+          standard: compileConfig.standard,
+          compilerPath: compileConfig.compilerPath,
+          windowsSdkVersion: compileConfig.windowsSdkVersion,
+        };
+
         log.debug(`Returning configuration for ${uri.fsPath}.`, logItem(() => {
           return {
-            includePath: realConfig.includePath,
-            defines: `${realConfig.defines.length} defines`,
-            intelliSenseMode: realConfig.intelliSenseMode,
-            standard: realConfig.standard,
-            forcedInclude: realConfig.forcedInclude,
-            compilerPath: realConfig.compilerPath,
-            windowsSdkVersion: realConfig.windowsSdkVersion,
+            includePath: config.includePath,
+            defines: `${config.defines.length} defines`,
+            intelliSenseMode: config.intelliSenseMode,
+            standard: config.standard,
+            forcedInclude: config.forcedInclude,
+            compilerPath: config.compilerPath,
+            windowsSdkVersion: config.windowsSdkVersion,
           };
         }, config));
 

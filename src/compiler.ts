@@ -6,7 +6,7 @@ import { ProcessResult, exec, CmdArgs } from './exec';
 import { log } from './logging';
 import { FilePath, Disposable, StateProvider, FilePathSet } from './shared';
 import { config } from './config';
-import { shellParse } from './shell';
+import { bashShellParse } from './shell';
 
 type VERSIONS = 'c89' | 'c99' | 'c11' | 'c++98' | 'c++03' | 'c++11' | 'c++14' | 'c++17';
 type INTELLISENSE_MODES = 'msvc-x64' | 'gcc-x64' | 'clang-x64';
@@ -49,6 +49,8 @@ export interface CompileConfig {
   forcedIncludes: FilePathSet;
   intelliSenseMode: INTELLISENSE_MODES;
   standard: VERSIONS;
+  compilerPath?: string;
+  windowsSdkVersion?: string;
 }
 
 function cloneConfig(config: CompileConfig): CompileConfig {
@@ -58,7 +60,9 @@ function cloneConfig(config: CompileConfig): CompileConfig {
     forcedIncludes: new FilePathSet(config.forcedIncludes),
     intelliSenseMode: config.intelliSenseMode,
     standard: config.standard,
-  };
+    compilerPath: config.compilerPath,
+    windowsSdkVersion: config.windowsSdkVersion,
+    };
 }
 
 function addCompilerArgumentsToConfig(cmdLine: string|undefined, forceIncludeArg: string, config: CompileConfig): void {
@@ -66,13 +70,9 @@ function addCompilerArgumentsToConfig(cmdLine: string|undefined, forceIncludeArg
     return;
   }
 
-  let args: CmdArgs = shellParse(cmdLine);
-  let arg: FilePath|string|undefined;
+  let args: string[] = bashShellParse(cmdLine);
+  let arg: string|undefined;
   while (arg = args.shift()) {
-    if (arg instanceof FilePath) {
-      continue;
-    }
-
     if (arg.length < 2 || (arg.charAt(0) !== '-' && arg.charAt(0) !== '/')) {
       continue;
     }
@@ -83,7 +83,7 @@ function addCompilerArgumentsToConfig(cmdLine: string|undefined, forceIncludeArg
         config.defines.set(define.key, define);
         continue;
       case 'I':
-        config.includes.add(FilePath.fromPath(arg.substring(2)));
+        config.includes.add(FilePath.fromUnixy(arg.substring(2)));
         continue;
     }
 
@@ -166,7 +166,7 @@ class ClangCompiler extends Compiler {
     return state;
   }
 
-  private static parseCompilerDefaults(output: string, defaults: CompileConfig): void {
+  public static parseCompilerDefaults(output: string, defaults: CompileConfig): void {
     let lines: string[] = output.trim().split('\n');
 
     let inIncludes: boolean = false;
@@ -233,10 +233,10 @@ class ClangCompiler extends Compiler {
       ClangCompiler.parseCompilerDefaults(result.stdout, defaults);
       ClangCompiler.parseCompilerDefaults(result.stderr, defaults);
 
-      if (defaults.includes.size === 0 || defaults.defines.size === 0) {
-        throw new Error('Compiler returned empty includes or defines.');
+      if (defaults.defines.size === 0 && !defaults.compilerPath) {
+        throw new Error('Failed to discover compiler defaults.');
       }
-
+  
       return new ClangCompiler(srcdir, command, type, defaults);
     } catch (e) {
       log.error('Failed to get compiler defaults', e);
@@ -261,19 +261,36 @@ class MsvcCompiler extends Compiler {
   }
 
   public static async fetch(srcdir: FilePath, command: CmdArgs, type: FileType, compilerType: string): Promise<Compiler> {
-    let defaults: CompileConfig = {
-      includes: new FilePathSet(),
-      defines: new Map(),
-      forcedIncludes: new FilePathSet(),
-      intelliSenseMode: compilerType === 'msvc' ? 'msvc-x64' : 'clang-x64' as INTELLISENSE_MODES,
-      standard: type === FileType.C ? C_STANDARD : CPP_STANDARD,
-    };
-
-    if (defaults.includes.size === 0 || defaults.defines.size === 0) {
-      throw new Error('Compiler returned empty includes or defined.');
+    if (compilerType === 'msvc') {
+      throw new Error('The msvc compiler is currently not supported.');
     }
 
-    return new MsvcCompiler(srcdir, command, type, defaults);
+    let defaultCmd: CmdArgs = (await config.getCompiler(srcdir.toUri(), type)) || command.slice(0);
+    defaultCmd.push('-v', '-E', '-Xclang', '-dM', '/dev/null');
+
+    try {
+      let result: ProcessResult = await exec(defaultCmd);
+
+      let defaults: CompileConfig = {
+        includes: new FilePathSet(),
+        defines: new Map(),
+        forcedIncludes: new FilePathSet(),
+        intelliSenseMode: compilerType === 'msvc' ? 'msvc-x64' : 'clang-x64' as INTELLISENSE_MODES,
+        standard: type === FileType.C ? C_STANDARD : CPP_STANDARD,
+      };
+
+      ClangCompiler.parseCompilerDefaults(result.stdout, defaults);
+      ClangCompiler.parseCompilerDefaults(result.stderr, defaults);
+
+      if (defaults.defines.size === 0 && !defaults.compilerPath) {
+        throw new Error('Failed to discover compiler defaults.');
+      }
+
+      return new MsvcCompiler(srcdir, command, type, defaults);
+    } catch (e) {
+      log.error('Failed to get compiler defaults', e);
+      throw e;
+    }
   }
 
   public addCompilerArgumentsToConfig(cmdLine: string|undefined, config: CompileConfig): void {

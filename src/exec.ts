@@ -7,7 +7,7 @@ import { ChildProcess, spawn } from 'child_process';
 import { log } from './logging';
 import { config } from './config';
 import { FilePath } from './shared';
-import { shellQuote } from './shell';
+import { bashShellQuote } from './shell';
 
 export interface ProcessResult {
   code: number;
@@ -101,7 +101,12 @@ let mozillaBuildExec: Exec = async (args: CmdArgs, cwd?: FilePath, env?: NodeJS.
     MOZILLABUILD: mozillaBuild.toPath() + '\\',
   }, env);
 
-  let shellCmd: string = shellQuote(args, (path) => path.toUnixy());
+  let shellCmd: string = bashShellQuote(args.map((part) => {
+    if (part instanceof FilePath) {
+      return part.toUnixy();
+    }
+    return part;
+  }));
   let command: string = mozillaBuild.join('msys', 'bin', 'bash.exe').toPath();
 
   try {

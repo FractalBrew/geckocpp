@@ -11,7 +11,6 @@ import { workspace } from './workspace';
 import { FilePath, StateProvider, Disposable } from './shared';
 import { CmdArgs } from './exec';
 import { FileType } from './compiler';
-import { log } from './logging';
 import { shellParse } from './shell';
 
 export enum Level {
@@ -36,11 +35,7 @@ async function asCmdArgs(cmdLine: string): Promise<CmdArgs> {
     }
   }
 
-  async function fixup(arg: FilePath|string): Promise<string|FilePath> {
-    if (arg instanceof FilePath) {
-      return arg;
-    }
-
+  async function fixup(arg: string): Promise<string|FilePath> {
     if (await isPath(arg)) {
       return FilePath.fromPath(arg);
     }

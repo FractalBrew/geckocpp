@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import * as vscode from 'vscode';
-import * as cpptools from 'vscode-cpptools';
 
 import { Build } from './build';
 import { CompileConfig, Define } from './compiler';
@@ -56,25 +55,11 @@ export class SourceFolder implements StateProvider, Disposable {
     return this.build.getIncludePaths();
   }
 
-  public async getSourceConfiguration(uri: vscode.Uri): Promise<cpptools.SourceFileConfiguration|undefined> {
+  public async getSourceConfiguration(uri: vscode.Uri): Promise<CompileConfig|undefined> {
     if (!this.build) {
       return Promise.resolve(undefined);
     }
 
-    function outputDefine(define: Define): string {
-      return `${define.key}=${define.value}`;
-    }
-
-    let config: CompileConfig|undefined = await this.build.getSourceConfiguration(FilePath.fromUri(uri));
-    if (config) {
-      return {
-        includePath: Array.from(config.includes).map((p) => p.toPath()),
-        defines: Array.from(config.defines.values()).map(outputDefine),
-        forcedInclude: Array.from(config.forcedIncludes).map((p) => p.toPath()),
-        intelliSenseMode: config.intelliSenseMode,
-        standard: config.standard,
-      };
-    }
-    return undefined;
+    return this.build.getSourceConfiguration(FilePath.fromUri(uri));
   }
 }

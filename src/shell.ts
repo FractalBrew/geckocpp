@@ -2,61 +2,300 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { FilePath } from './shared';
-import { CmdArgs } from './exec';
-
-export type PathFromArg = (arg: string) => FilePath|string;
-
-export function shellParse(cmdLine: string, pathConvert?: PathFromArg): CmdArgs {
-  let results: CmdArgs = [];
-  function push(str: string): void {
-    if (pathConvert) {
-      results.push(pathConvert(str));
-    } else {
-      results.push(str);
-    }
+export function bashShellParse(cmdLine: string): string[] {
+  enum State {
+    Base = 0,
+    Normal,
+    Single,
+    Double,
   }
 
-  let singleFinder: RegExp = /^((?:.|\\\'))*'/;
-  let doubleFinder: RegExp = /^((?:.|\\\"))*"/;
-  let endFinder: RegExp = /^((?:\S|\\\ ))* /;
-  let nextFinder: RegExp = /^\s*(\S)/;
+  let results: string[] = [];
+  let current: string = '';
+  let blockStart: number = 0;
+  let pos: number = 0;
+  let state: State = State.Base;
 
-  while (cmdLine.length) {
-    let result: RegExpExecArray|null = nextFinder.exec(cmdLine);
-    if (!result) {
-      break;
+  // Add the current block to the argument.
+  function addBlock(): void {
+    current += cmdLine.substring(blockStart, pos);
+    blockStart = pos + 1;
+  }
+
+  // Pushes the current argument to the results.
+  function push(): void {
+    // Add any pending block.
+    addBlock();
+
+    // This might fail at the end of the command line.
+    if (current.length) {
+      results.push(current);
     }
 
-    if (result[1] === '"' || result[1] === '\'') {
-      cmdLine = cmdLine.substring(result[0].length);
-    } else {
-      cmdLine = cmdLine.substring(result[0].length - 1);
+    // Onto the next argument.
+    current = '';
+  }
+
+  // What is it escaping?
+  function escaped(): string|undefined {
+    if (state === State.Single || state === State.Base || (pos + 1) >= cmdLine.length) {
+      return undefined;
     }
 
-    result = (result[1] === '"' ? doubleFinder : (result[1] === '\'' ? singleFinder : endFinder)).exec(cmdLine);
-    if (!result) {
-      push(cmdLine);
-      break;
+    let next: string = cmdLine.charAt(pos + 1);
+    if (state === State.Double) {
+      // In double quotes only some things can be escaped.
+      if (next === '"' || next === '\\' || next === '\n') {
+        return next;
+      }
+      return undefined;
     }
 
-    push(cmdLine.substring(0, result[1].length));
-    cmdLine = cmdLine.substring(result[0].length);
+    return next;
+  }
+
+  while (pos < cmdLine.length) {
+    let char: string = cmdLine.charAt(pos);
+    let escape: string|undefined = char === '\\' ? escaped() : undefined;
+
+    if (escape) {
+      // Cache up to here.
+      addBlock();
+
+      if (escape === '\n') {
+        // Entirely skip the newline.
+        blockStart++;
+      }
+
+      // Skip over the escaped character.
+      pos += 2;
+      continue;
+    }
+
+    switch (state) {
+      case State.Base: {
+        // Still not in an argument?
+        if (char === ' ' || char === '\t' || char === '\n') {
+          pos++;
+          continue;
+        }
+
+        // The new argument starts here.
+        blockStart = pos;
+        state = State.Normal;
+
+        // Recheck states using the same character.
+        continue;
+        break;
+      }
+      case State.Normal: {
+        if (char === ' ' || char === '\t' || char === '\n') {
+          // Found the end of the argument.
+          push();
+          state = State.Base;
+        } else if (char === '\'') {
+          // Start of a single-quoted block.
+          addBlock();
+          state = State.Single;
+        } else if (char === '"') {
+          // Start of a double-quoted block.
+          addBlock();
+          state = State.Double;
+        }
+
+        // Just a regular character to be included in the block.
+        break;
+      }
+      case State.Single: {
+        if (char === '\'') {
+          // End of the block.
+          addBlock();
+          state = State.Normal;
+        }
+        break;
+      }
+      case State.Double: {
+        if (char === '"') {
+          // End of the block.
+          addBlock();
+          state = State.Normal;
+        }
+        break;
+      }
+    }
+
+    pos++;
+  }
+
+  if (state !== State.Base) {
+    push();
   }
 
   return results;
 }
 
-export type PathToArg = (path: FilePath) => string;
+export function winShellParse(cmdLine: string): string[] {
+  enum State {
+    Base = 0,
+    Normal,
+    Double,
+  }
 
-export function shellQuote(args: CmdArgs, pathConvert?: PathToArg): string {
-  return args.map((a) => {
-    if (a instanceof FilePath) {
-      if (pathConvert) {
-        return pathConvert(a);
-      }
-      return a.toPath();
+  let results: string[] = [];
+  let current: string = '';
+  let blockStart: number = 0;
+  let pos: number = 0;
+  let state: State = State.Base;
+  let escapeCount: number = 0;
+
+  // Add the current block to the argument.
+  function addBlock(): void {
+    current += cmdLine.substring(blockStart, pos);
+    blockStart = pos + 1;
+  }
+
+  // Adds any pending escape characters.
+  function addEscapes(): void {
+    current += '\\'.repeat(escapeCount);
+    escapeCount = 0;
+  }
+
+  // Pushes the current argument to the results.
+  function push(): void {
+    // This might fail at the end of the command line.
+    if (current.length) {
+      results.push(current);
     }
-    return a;
+
+    // Onto the next argument.
+    current = '';
+  }
+
+  while (pos < cmdLine.length) {
+    let char: string = cmdLine.charAt(pos);
+
+    if (char === '\\') {
+      if (escapeCount === 0) {
+        if (state !== State.Base) {
+          addBlock();
+        } else {
+          state = State.Normal;
+        }
+      }
+
+      escapeCount++;
+    } else if (char === '"') {
+      if (escapeCount % 2) {
+        // An escaped double quote.
+        escapeCount = (escapeCount - 1) / 2;
+        addEscapes();
+
+        // Include the quote in the next block and start processing with the following character.
+        blockStart = pos;
+      } else {
+        if (escapeCount) {
+          // An unescaped double quote.
+          escapeCount = escapeCount / 2;
+          addEscapes();
+        } else if (state !== State.Base) {
+          addBlock();
+        }
+
+        // Next block starts after the quote, move into the right state and start processing
+        // with the next character.
+        blockStart = pos + 1;
+        if (state === State.Double) {
+          state = State.Normal;
+        } else {
+          state = State.Double;
+        }
+      }
+    } else {
+      if (escapeCount) {
+        addEscapes();
+        blockStart = pos;
+      }
+
+      if (char === ' ' || char === '\t') {
+        if (state === State.Normal) {
+          // Found the end of the argument.
+          addBlock();
+          push();
+          state = State.Base;
+        }
+      } else if (state === State.Base) {
+        // Found the start of the new argument.
+        state = State.Normal;
+        blockStart = pos;
+      }
+    }
+
+    pos++;
+  }
+
+  if (state !== State.Base) {
+    addEscapes();
+    addBlock();
+    push();
+  }
+
+  return results;
+}
+
+export function shellParse(cmdLine: string): string[] {
+  if (process.platform === 'win32') {
+    return winShellParse(cmdLine);
+  }
+  return bashShellParse(cmdLine);
+}
+
+export function bashShellQuote(args: string[]): string {
+  return args.map((a) => {
+    let doublePos: number = a.indexOf('"');
+    let singlePos: number = a.indexOf('\'');
+    let spacePos: number = a.indexOf(' ');
+    let escapePos: number = a.indexOf('\\');
+
+    if (doublePos < 0 && singlePos < 0 && spacePos < 0 && escapePos < 0) {
+      return a;
+    }
+
+    if (singlePos < 0) {
+      return `'${a}'`;
+    }
+
+    return '"' + a.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\\n') + '"';
   }).join(' ');
+}
+
+export function winShellQuote(args: string[]): string {
+  return args.map((a) => {
+    let doublePos: number = a.indexOf('"');
+    let spacePos: number = a.indexOf(' ');
+    let escapePos: number = a.indexOf('\\');
+
+    if (doublePos < 0 && spacePos < 0 && escapePos < 0) {
+      return a;
+    }
+
+    let escaped: string = a.replace(/\\*"|\\+/g, (match, ..._args: any[]) => {
+      if (match.endsWith('"')) {
+        let count: number = match.length - 1;
+        return '\\'.repeat((count * 2) + 1) + '"';
+      }
+      return match;
+    });
+      
+    if (spacePos >= 0) {
+      return '"' + escaped + '"';
+    }
+    return escaped;
+  }).join(' ');
+}
+
+export function shellQuote(args: string[]): string {
+  if (process.platform === 'win32') {
+    return winShellQuote(args);
+  }
+  return bashShellQuote(args);
 }
