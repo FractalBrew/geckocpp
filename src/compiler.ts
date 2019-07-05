@@ -266,6 +266,16 @@ class MsvcCompiler extends Compiler {
     }
 
     let defaultCmd: CmdArgs = (await config.getCompiler(srcdir.toUri(), type)) || command.slice(0);
+
+    switch (type) {
+      case FileType.CPP:
+        defaultCmd.push(`-std:${CPP_VERSION}`, '-TP');
+        break;
+      case FileType.C:
+        defaultCmd.push(`-std:${C_VERSION}`, '-TC');
+        break;
+    }
+
     defaultCmd.push('-v', '-E', '-Xclang', '-dM', '/dev/null');
 
     try {
