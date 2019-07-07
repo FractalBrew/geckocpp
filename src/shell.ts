@@ -251,42 +251,51 @@ export function shellParse(cmdLine: string): string[] {
 
 export function bashShellQuote(args: string[]): string {
   return args.map((a) => {
-    let doublePos: number = a.indexOf('"');
-    let singlePos: number = a.indexOf('\'');
-    let spacePos: number = a.indexOf(' ');
-    let escapePos: number = a.indexOf('\\');
+    function contains(str: string): boolean {
+      for (let i: number = 0; i < str.length; i++) {
+        if (a.indexOf(str.charAt(i)) >= 0) {
+          return true;
+        }
+      }
+      return false;
+    }
 
-    if (doublePos < 0 && singlePos < 0 && spacePos < 0 && escapePos < 0) {
+    if (!contains('"\' \\()')) {
       return a;
     }
 
-    if (singlePos < 0) {
+    if (!contains('\'')) {
       return `'${a}'`;
     }
 
-    return '"' + a.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\\n') + '"';
+    return '"' + a.replace(/\\/g, '\\\\').replace(/[()"\n]/g, '\\$&') + '"';
   }).join(' ');
 }
 
 export function winShellQuote(args: string[]): string {
   return args.map((a) => {
-    let doublePos: number = a.indexOf('"');
-    let spacePos: number = a.indexOf(' ');
-    let escapePos: number = a.indexOf('\\');
+    function contains(str: string): boolean {
+      for (let i: number = 0; i < str.length; i++) {
+        if (a.indexOf(str.charAt(i)) >= 0) {
+          return true;
+        }
+      }
+      return false;
+    }
 
-    if (doublePos < 0 && spacePos < 0 && escapePos < 0) {
+    if (!contains('"\' \\')) {
       return a;
     }
 
     let escaped: string = a.replace(/\\*"|\\+/g, (match, ..._args: any[]) => {
-      if (match.endsWith('"')) {
+      if (!match.endsWith('\\')) {
         let count: number = match.length - 1;
         return '\\'.repeat((count * 2) + 1) + '"';
       }
       return match;
     });
       
-    if (spacePos >= 0) {
+    if (contains(' ')) {
       return '"' + escaped + '"';
     }
     return escaped;

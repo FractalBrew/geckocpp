@@ -35,6 +35,12 @@ describe('bash', () => {
       expect(bashShellParse('works "in\\\nquotes"')).toStrictEqual(['works', 'inquotes']);
       expect(bashShellParse('not \'in\\\nsingle quotes\'')).toStrictEqual(['not', 'in\\\nsingle quotes']);
     });
+
+    it('handles braces', () => {
+      expect(bashShellParse('foo test\\(\\)')).toStrictEqual(['foo', 'test()']);
+      expect(bashShellParse('foo \'test()\'')).toStrictEqual(['foo', 'test()']);
+      expect(bashShellParse('foo "test()"')).toStrictEqual(['foo', 'test()']);
+    });
   });
 
   describe('shellQuote', () => {
@@ -71,6 +77,10 @@ describe('bash', () => {
 
     it('handles complex cases', () => {
       check(['complex', 'foo"bar\'baz bopdiz daz\\oh'], 'complex "foo\\"bar\'baz bopdiz daz\\\\oh"');
+    });
+
+    it('quotes braces', () => {
+      check(['test', 'foo()'], 'test \'foo()\'');
     });
   });
 });
