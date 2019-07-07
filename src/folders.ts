@@ -62,4 +62,13 @@ export class SourceFolder implements StateProvider, Disposable {
 
     return this.build.getSourceConfiguration(FilePath.fromUri(uri));
   }
+
+  public async testCompile(uri: vscode.Uri): Promise<void> {
+    if (!this.build) {
+      return;
+    }
+
+    return this.build.testCompile(FilePath.fromUri(uri));
+  }
+
 }

@@ -7,46 +7,11 @@ import * as vscode from 'vscode';
 import { Level, config } from './config';
 import { FilePath, Disposable, StateProvider } from './shared';
 
-type LogItemGetter = () => any;
-
-class LogItem {
-  private getter: LogItemGetter;
-  private actual: any|undefined;
-  private got: any|undefined;
-
-  public constructor(getter: LogItemGetter, actual?: any) {
-    this.getter = getter;
-    this.actual = actual;
-  }
-
-  public getForOutput(): any {
-    if (this.got) {
-      return this.got;
-    }
-
-    return this.got = this.getter();
-  }
-
-  public getForConsole(): any {
-    if (this.actual) {
-      return this.actual;
-    }
-
-    return this.getForOutput();
-  }
-}
-
-export function logItem(getter: LogItemGetter, actual?: any): LogItem {
-  return new LogItem(getter, actual);
-}
+type LogItemGetter = (level: Level) => string;
 
 function intoPrimitive(value: any): any {
   if (Array.isArray(value)) {
-    return value.map(intoPrimitive);
-  }
-
-  if (value instanceof LogItem) {
-    value = value.getForOutput();
+    return value.map((v) => intoPrimitive(v));
   }
 
   if (value === null) {
@@ -78,6 +43,102 @@ function intoPrimitive(value: any): any {
   }
 }
 
+export interface LogItem {
+  getForOutput(level: Level): string;
+  getForConsole(): any;
+}
+
+export abstract class LogItemImpl implements LogItem {
+  public getForOutput(_level: Level): string {
+    return this.getForConsole();
+  }
+
+  public getForConsole(): string {
+    return this.getForOutput(Level.Debug);
+  }
+}
+
+class WrappedLogItem extends LogItemImpl {
+  private item: any;
+
+  public constructor(item: any) {
+    super();
+    this.item = item;
+  }
+
+  public getForOutput(level: Level): string {
+    if (typeof this.item === 'object') {
+      if ("getForOutput" in this.item) {
+        return this.item.getForOutput(level);
+      }
+
+      if ("getForConsole" in this.item) {
+        return String(this.item.getForConsole());
+      }
+    }
+
+    let result: any = intoPrimitive(this.item);
+    if (typeof result === 'object') {
+      return JSON.stringify(result, null, 2);
+    }
+    return String(result);
+  }
+
+  public getForConsole(): any {
+    if (typeof this.item === 'object') {
+      if ("getForConsole" in this.item) {
+        return this.item.getForConsole();
+      }
+
+      if ("getForOutput" in this.item) {
+        return this.item.getForOutput(Level.Debug);
+      }
+    }
+
+    return intoPrimitive(this.item);
+  }
+}
+
+function asLogItem(item: any): LogItem {
+  if (item instanceof LogItemImpl) {
+    return item;
+  }
+
+  return new WrappedLogItem(item);
+}
+
+class ComposedLogItem extends LogItemImpl {
+  private getter: LogItemGetter;
+  private actual: any|undefined;
+  private got: string|undefined;
+
+  public constructor(getter: LogItemGetter, actual?: any) {
+    super();
+    this.getter = getter;
+    this.actual = actual;
+  }
+
+  public getForOutput(level: Level): string {
+    if (this.got) {
+      return this.got;
+    }
+
+    return this.got = this.getter(level);
+  }
+
+  public getForConsole(): any {
+    if (this.actual) {
+      return this.actual;
+    }
+
+    return this.getForOutput(Level.Debug);
+  }
+}
+
+export function logItem(getter: LogItemGetter, actual?: any): LogItem {
+  return new ComposedLogItem(getter, actual);
+}
+
 class Logger implements Disposable {
   private name: string;
   private channel?: vscode.OutputChannel;
@@ -100,7 +161,7 @@ class Logger implements Disposable {
     return level >= config.getLogLevel();
   }
 
-  private writeOutput(str: string, show: boolean): void {
+  public writeOutput(show: boolean, str: string): void {
     if (!this.channel) {
       this.channel = vscode.window.createOutputChannel(this.name);
     }
@@ -112,8 +173,9 @@ class Logger implements Disposable {
 
   private output(level: Level, ...args: any[]): void {
     let levelstr: string = Level[level];
+    let logItems: LogItem[] = args.map(asLogItem);
 
-    let consoleArgs: any[] = args.map((a) => a instanceof LogItem ? a.getForConsole() : a);
+    let consoleArgs: any[] = logItems.map((l) => l.getForConsole());
 
     switch (level) {
       case Level.Warn:
@@ -131,15 +193,16 @@ class Logger implements Disposable {
       return;
     }
 
-    this.writeOutput(`${levelstr}: ${args.map((a) => JSON.stringify(intoPrimitive(a), null, '  ')).join(' ')}`, this.shouldOpen(level));
+    let outputLevel: Level = config.getLogLevel();
+
+    this.writeOutput(this.shouldOpen(level), `${levelstr}: ${logItems.map((a) => a.getForOutput(outputLevel)).join(' ')}`);
   }
 
   public async dumpState(obj: StateProvider): Promise<void> {
-    let state: any = await obj.toState();
-    console.log('Current state', state);
+    let state: LogItem = asLogItem(await obj.toState());
+    console.log('Current state', state.getForConsole());
 
-    let str: string = JSON.stringify(intoPrimitive(state), null, 2);
-    this.writeOutput(`Mozilla intellisense state: ${str}`, true);
+    this.writeOutput(true, `Mozilla intellisense state: ${state.getForOutput(Level.Debug)}`);
   }
 
   public debug(...args: any[]): void {

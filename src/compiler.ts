@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { ProcessResult, exec, CmdArgs } from './exec';
+import { ProcessResult, exec, CmdArgs, ProcessError } from './exec';
 import { log } from './logging';
 import { FilePath, Disposable, StateProvider, FilePathSet } from './shared';
 import { config } from './config';
@@ -45,24 +45,30 @@ function buildDefine(text: string, splitter: string): Define {
 
 export interface CompileConfig {
   includes: FilePathSet;
+  sysIncludes: FilePathSet;
+  osxFrameworkIncludes: FilePathSet;
   defines: Map<string, Define>;
   forcedIncludes: FilePathSet;
   intelliSenseMode: INTELLISENSE_MODES;
   standard: VERSIONS;
   compilerPath?: string;
   windowsSdkVersion?: string;
+  osxSdk?: FilePath;
 }
 
 function cloneConfig(config: CompileConfig): CompileConfig {
   return {
     includes: new FilePathSet(config.includes),
+    sysIncludes: new FilePathSet(config.sysIncludes),
+    osxFrameworkIncludes: new FilePathSet(config.osxFrameworkIncludes),
     defines: new Map(config.defines),
     forcedIncludes: new FilePathSet(config.forcedIncludes),
     intelliSenseMode: config.intelliSenseMode,
     standard: config.standard,
     compilerPath: config.compilerPath,
     windowsSdkVersion: config.windowsSdkVersion,
-    };
+    osxSdk: config.osxSdk,
+  };
 }
 
 function addCompilerArgumentsToConfig(cmdLine: string|undefined, forceIncludeArg: string, config: CompileConfig): void {
@@ -118,7 +124,9 @@ export abstract class Compiler implements Disposable, StateProvider {
       type: this.type,
       command: this.command,
       override: await config.getCompiler(this.srcdir.toUri(), this.type),
-      includes: this.defaults.includes.size,
+      includes: Array.from(this.defaults.includes),
+      sysIncludes: Array.from(this.defaults.sysIncludes),
+      osxFrameworkIncludes: Array.from(this.defaults.osxFrameworkIncludes),
       defines: this.defaults.defines.size,
     };
   }
@@ -149,10 +157,23 @@ export abstract class Compiler implements Disposable, StateProvider {
   }
 
   public getIncludePaths(): FilePathSet {
-    return new FilePathSet(this.defaults.includes);
+    let includes: FilePathSet = new FilePathSet();
+    function addIncludes(set: FilePathSet): void {
+      for (let include of set) {
+        includes.add(include);
+      }
+    }
+
+    addIncludes(this.defaults.sysIncludes);
+    addIncludes(this.defaults.osxFrameworkIncludes);
+    addIncludes(this.defaults.includes);
+
+    return new FilePathSet(includes);
   }
 
   public abstract addCompilerArgumentsToConfig(cmdLine: string|undefined, config: CompileConfig): void;
+
+  public abstract compile(config: CompileConfig, source: FilePath): Promise<ProcessResult>;
 }
 
 class ClangCompiler extends Compiler {
@@ -166,16 +187,18 @@ class ClangCompiler extends Compiler {
     return state;
   }
 
-  public static parseCompilerDefaults(output: string, defaults: CompileConfig): void {
-    let lines: string[] = output.trim().split('\n');
-
+  public static parseCompilerDefaults(output: string[], defaults: CompileConfig): void {
     let inIncludes: boolean = false;
-    for (let line of lines) {
+    let inSysIncludes: boolean = false;
+
+    for (let line of output) {
       if (inIncludes) {
         if (line.charAt(0) === ' ') {
           let include: string = line.trim();
           if (include.endsWith(FRAMEWORK_MARKER)) {
-            defaults.includes.add(FilePath.fromPath(include.substring(0, include.length - FRAMEWORK_MARKER.length)));
+            defaults.osxFrameworkIncludes.add(FilePath.fromPath(include.substring(0, include.length - FRAMEWORK_MARKER.length)));
+          } else if (inSysIncludes) {
+            defaults.sysIncludes.add(FilePath.fromPath(include));
           } else {
             defaults.includes.add(FilePath.fromPath(include));
           }
@@ -187,6 +210,7 @@ class ClangCompiler extends Compiler {
 
       if (line.startsWith('#include ')) {
         inIncludes = true;
+        inSysIncludes = line.charAt(9) === '<';
       } else if (line.startsWith('#define ')) {
         let define: Define = buildDefine(line.substring(8).trim(), ' ');
         defaults.defines.set(define.key, define);
@@ -224,14 +248,15 @@ class ClangCompiler extends Compiler {
 
       let defaults: CompileConfig = {
         includes: new FilePathSet(),
+        sysIncludes: new FilePathSet(),
+        osxFrameworkIncludes: new FilePathSet(),
         defines: new Map(),
         forcedIncludes: new FilePathSet(),
         intelliSenseMode: 'clang-x64' as INTELLISENSE_MODES,
         standard: type === FileType.C ? C_STANDARD : CPP_STANDARD,
       };
 
-      ClangCompiler.parseCompilerDefaults(result.stdout, defaults);
-      ClangCompiler.parseCompilerDefaults(result.stderr, defaults);
+      ClangCompiler.parseCompilerDefaults(result.output, defaults);
 
       if (defaults.defines.size === 0 && !defaults.compilerPath) {
         throw new Error('Failed to discover compiler defaults.');
@@ -247,6 +272,46 @@ class ClangCompiler extends Compiler {
   public addCompilerArgumentsToConfig(cmdLine: string|undefined, config: CompileConfig): void {
     addCompilerArgumentsToConfig(cmdLine, '-include', config);
   }
+
+  public async compile(compileConfig: CompileConfig, source: FilePath): Promise<ProcessResult> {
+    let command: CmdArgs = (await config.getCompiler(source.toUri(), this.type)) || this.command.slice(0);
+    if (this.defaults.osxSdk) {
+      command.push('-isysroot', this.defaults.osxSdk.toPath());
+    }
+
+    command.push('-nobuiltininc', '-undef', '-c', '-Wno-everything');
+
+    for (let include of compileConfig.sysIncludes) {
+      command.push(`-isystem${include.toPath()}`);
+    }
+
+    for (let include of compileConfig.osxFrameworkIncludes) {
+      command.push(`-iframework${include.toPath()}`);
+    }
+
+    for (let define of compileConfig.defines.values()) {
+      command.push(`-D${define.key}=${define.value}`);
+    }
+
+    for (let include of compileConfig.includes) {
+      command.push(`-I${include.toPath()}`);
+    }
+
+    for (let include of compileConfig.forcedIncludes) {
+      command.push('-include', include.toPath());
+    }
+
+    command.push(source.toPath());
+
+    try {
+      return await exec(command, source.parent());
+    } catch (e) {
+      if (e instanceof ProcessError) {
+        return e.result;
+      }
+      throw e;
+    }
+  }
 }
 
 class MsvcCompiler extends Compiler {
@@ -256,7 +321,7 @@ class MsvcCompiler extends Compiler {
 
   public async toState(): Promise<any> {
     let state: any = await super.toState();
-    state.type = 'clang';
+    state.type = 'clang-cl';
     return state;
   }
 
@@ -283,14 +348,15 @@ class MsvcCompiler extends Compiler {
 
       let defaults: CompileConfig = {
         includes: new FilePathSet(),
+        sysIncludes: new FilePathSet(),
+        osxFrameworkIncludes: new FilePathSet(),
         defines: new Map(),
         forcedIncludes: new FilePathSet(),
         intelliSenseMode: compilerType === 'msvc' ? 'msvc-x64' : 'clang-x64' as INTELLISENSE_MODES,
         standard: type === FileType.C ? C_STANDARD : CPP_STANDARD,
       };
 
-      ClangCompiler.parseCompilerDefaults(result.stdout, defaults);
-      ClangCompiler.parseCompilerDefaults(result.stderr, defaults);
+      ClangCompiler.parseCompilerDefaults(result.output, defaults);
 
       if (defaults.defines.size === 0 && !defaults.compilerPath) {
         throw new Error('Failed to discover compiler defaults.');
@@ -305,5 +371,9 @@ class MsvcCompiler extends Compiler {
 
   public addCompilerArgumentsToConfig(cmdLine: string|undefined, config: CompileConfig): void {
     addCompilerArgumentsToConfig(cmdLine, '-FI', config);
+  }
+
+  public async compile(_compileConfig: CompileConfig, _source: FilePath): Promise<ProcessResult> {
+    throw new Error('Test compiling is not yet supported on Windows.');
   }
 }

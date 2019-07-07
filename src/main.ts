@@ -7,9 +7,9 @@ import * as vscode from 'vscode';
 import { workspace } from './workspace';
 import { config } from './config';
 import { log } from './logging';
+import { SourceFolder } from './folders';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  console.log(process.versions);
   context.subscriptions.push(
     config,
     log,
@@ -20,6 +20,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
     vscode.commands.registerCommand('mozillacpp.dumpState', () => {
       log.dumpState(workspace);
+    }),
+    vscode.commands.registerCommand('mozillacpp.testCompile', async () => {
+      let editor: vscode.TextEditor|undefined = vscode.window.activeTextEditor;
+      if (!editor) {
+        return;
+      }
+
+      let folder: SourceFolder|undefined = await workspace.getFolder(editor.document.uri);
+      if (!folder || !folder.isMozillaSource()) {
+        return;
+      }
+
+      folder.testCompile(editor.document.uri);
     }),
   );
 }

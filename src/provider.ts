@@ -87,9 +87,20 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
         function outputDefine(define: Define): string {
           return `${define.key}=${define.value}`;
         }
-    
+
+        let includes: string[] = [];
+        function addIncludes(set: FilePathSet): void {
+          for (let include of set) {
+            includes.push(include.toPath());
+          }
+        }
+
+        addIncludes(compileConfig.sysIncludes);
+        addIncludes(compileConfig.osxFrameworkIncludes);
+        addIncludes(compileConfig.includes);
+
         let config: cpptools.SourceFileConfiguration = {
-          includePath: Array.from(compileConfig.includes).map((p) => p.toPath()),
+          includePath: includes,
           defines: Array.from(compileConfig.defines.values()).map(outputDefine),
           forcedInclude: Array.from(compileConfig.forcedIncludes).map((p) => p.toPath()),
           intelliSenseMode: compileConfig.intelliSenseMode,
@@ -98,17 +109,14 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
           windowsSdkVersion: compileConfig.windowsSdkVersion,
         };
 
-        log.debug(`Returning configuration for ${uri.fsPath}.`, logItem(() => {
-          return {
-            includePath: config.includePath,
-            defines: `${config.defines.length} defines`,
-            intelliSenseMode: config.intelliSenseMode,
-            standard: config.standard,
-            forcedInclude: config.forcedInclude,
-            compilerPath: config.compilerPath,
-            windowsSdkVersion: config.windowsSdkVersion,
-          };
-        }, config));
+        log.debug(`Returning configuration for ${uri.fsPath}:`, logItem(() => '\n' +
+`includePath: ${JSON.stringify(config.includePath, null, 2)}
+defines: ${config.defines.length}
+intelliSenseMode: ${config.intelliSenseMode}
+standard: ${config.standard}
+forcedInclude: ${JSON.stringify(config.forcedInclude, null, 2)}
+compilerPath: ${config.compilerPath}
+windowsSdkVersion: ${config.windowsSdkVersion}`.split('\n').map((s) => '  ' + s).join('\n'), config));
 
         return {
           uri: uri,

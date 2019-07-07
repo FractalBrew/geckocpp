@@ -75,9 +75,16 @@ class Mach implements Disposable, StateProvider {
   public async getEnvironment(): Promise<MachEnvironment> {
     try {
       let result: ProcessResult = await this.baseExec(['environment', '--format', 'json']);
-      return intoEnvironment(JSON.parse(result.stdout));
+      let data: string = result.stdout.join('');
+      try {
+        let json: any = JSON.parse(data);
+        return intoEnvironment(json);
+      } catch (e) {
+        log.error('Failed to parse mach environment.', data);
+        throw e;
+      }
     } catch (e) {
-      log.error(e);
+      log.error('Unable to parse mach environment.', e);
       throw new Error('Unable to parse mach environment.');
     }
   }
@@ -138,6 +145,8 @@ export abstract class Build implements Disposable, StateProvider {
   public abstract getIncludePaths(): FilePathSet;
 
   public abstract getSourceConfiguration(path: FilePath): Promise<CompileConfig|undefined>;
+
+  public abstract testCompile(path: FilePath): Promise<void>;
 }
 
 async function parseConfig(path: FilePath, config: Map<string, string>): Promise<void> {
@@ -202,7 +211,7 @@ class RecursiveMakeBuild extends Build {
       return undefined;
     }
 
-    let cppPath: string|undefined = config.get('_CC');
+    let cppPath: string|undefined = config.get('_CXX');
     if (!cppPath) {
       log.error('No C++ compiler found.');
       return undefined;
@@ -266,5 +275,27 @@ class RecursiveMakeBuild extends Build {
     }
 
     return config;
+  }
+
+  public async testCompile(source: FilePath): Promise<void> {
+    let type: string = source.extname();
+
+    let config: CompileConfig|undefined = await this.getSourceConfiguration(source);
+    if (!config) {
+      return;
+    }
+
+    let compiler: Compiler = type === '.c' ? this.cCompiler : this.cppCompiler;
+    try {
+      let result: ProcessResult = await compiler.compile(config, source);
+      let output: string = result.exitCode === 0 ?
+          `Compiling ${source.toPath()} succeeded:` :
+          `Compiling ${source.toPath()} failed with exit code ${result.exitCode}:`;
+      output += `\n${result.output.join('')}`;
+      log.writeOutput(true, output);
+      console.log(result.getForConsole());
+    } catch (e) {
+      log.error(e);
+    }
   }
 }

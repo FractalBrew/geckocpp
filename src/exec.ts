@@ -4,25 +4,209 @@
 
 import { ChildProcess, spawn } from 'child_process';
 
-import { log } from './logging';
-import { config } from './config';
+import { log, LogItem, LogItemImpl } from './logging';
+import { config, Level } from './config';
 import { FilePath } from './shared';
 import { bashShellQuote } from './shell';
 
-export interface ProcessResult {
-  code: number;
-  stdout: string;
-  stderr: string;
+function lineSplit(data: string): string[] {
+  let results: string[] = [];
+  let lineStart: number = 0;
+
+  let i: number = 0;
+  while (i < data.length) {
+    if (data.charAt(i) === '\n') {
+      results.push(data.substring(lineStart, i + 1));
+      lineStart = i + 1;
+    }
+
+    i++;
+  }
+
+  if (lineStart < data.length) {
+    results.push(data.substring(lineStart));
+  }
+
+  return results;
 }
 
-export class ProcessError extends Error {
-  public command: string|undefined;
-  public result: ProcessResult|undefined;
+enum Pipe {
+  StdOut,
+  StdErr,
+}
 
-  public constructor(message: string, command?: string, result?: ProcessResult) {
-    super(message);
-    this.command = command;
+interface ProcessOutput {
+  pipe: Pipe;
+  data: string;
+}
+
+export class ProcessResult extends LogItemImpl {
+  private command: string;
+  private args: string[];
+  private processExitCode: number;
+  private processOutput: ProcessOutput[];
+  private processError?: Error;
+
+  private constructor(command: string, args: string[]) {
+    super();
+    this.command = command,
+    this.args = args,
+    this.processExitCode = 0;
+    this.processOutput = [];
+  }
+
+  private addOutput(pipe: Pipe, data: string): void {
+    if (!data) {
+      return;
+    }
+
+    this.processOutput.push({ pipe, data });
+  }
+
+  public static async waitFor(command: string, args: string[], childProcess: ChildProcess): Promise<ProcessResult> {
+    return new Promise((resolve, reject) => {
+      let result: ProcessResult = new ProcessResult(command, args);
+      log.debug(`Executing '${result.printableCommand()}'`);
+      let seenError: boolean = false;
+
+      childProcess.stdout.setEncoding('utf8');
+      childProcess.stdout.on('data', (data) => {
+        if (seenError) {
+          return;
+        }
+
+        result.addOutput(Pipe.StdOut, data);
+      });
+
+      childProcess.stderr.setEncoding('utf8');
+      childProcess.stderr.on('data', (data) => {
+        if (seenError) {
+          return;
+        }
+
+        result.addOutput(Pipe.StdErr, data);
+      });
+
+      childProcess.on('error', (err: Error) => {
+        seenError = true;
+        result.processExitCode = -1;
+        result.processError = err;
+        reject(new ProcessError(result));
+      });
+
+      childProcess.on('close', (code) => {
+        if (seenError) {
+          return;
+        }
+
+        if (code === 0) {
+          resolve(result);
+        } else {
+          result.processExitCode = code;
+          reject(new ProcessError(result));
+        }
+      });
+    });
+  }
+
+  private combineParts(parts: ProcessOutput[]): string[] {
+    return lineSplit(parts.reduce((value: string, current: ProcessOutput) => {
+      return value + current.data;
+    }, ''));
+  }
+
+  public printableCommand(): string {
+    if (this.args.length > 10) {
+      return `${this.command} ${this.args.slice(0, 9).join(' ')} ...`;
+    }
+    return `${this.command} ${this.args.join(' ')}`;
+  }
+
+  public removeSubstring(pipe: Pipe, start: number, end: number): void {
+    let i: number = 0;
+    while (i < this.processOutput.length && start >= 0 && end >= 0) {
+      let output: ProcessOutput = this.processOutput[i];
+      if (output.pipe !== pipe) {
+        i++;
+        continue;
+      }
+
+      let dataLen: number = output.data.length;
+
+      if (start < output.data.length) {
+        output.data = output.data.substring(0, start) + output.data.substring(end);
+        start = Math.max(0, start - dataLen);
+        end -= dataLen;
+
+        if (output.data.length === 0) {
+          this.processOutput.splice(i, 1);
+          continue;
+        }
+      }
+
+      i++;
+    }
+  }
+
+  public get exitCode(): number {
+    return this.processExitCode;
+  }
+
+  public get stderr(): string[] {
+    return this.combineParts(this.processOutput.filter((o) => o.pipe === Pipe.StdErr));
+  }
+
+  public get stdout(): string[] {
+    return this.combineParts(this.processOutput.filter((o) => o.pipe === Pipe.StdOut));
+  }
+
+  public get output(): string[] {
+    return this.combineParts(this.processOutput);
+  }
+
+  public getForOutput(level: Level): string {
+    let output: string = '';
+    if (this.processError) {
+      output += `Execution of ${this.printableCommand()} failed: ${this.processError.message}.`;
+    } else {
+      output += `Execution of ${this.printableCommand()} finished with exit code ${this.exitCode}.`;
+    }
+
+    if (level <= Level.Log) {
+      output += `\n${this.output.join('')}`;
+    }
+
+    return output;
+  }
+
+  public getForConsole(): any {
+    return {
+      command: this.printableCommand(),
+      exitCode: this.exitCode,
+      stdout: this.stdout.map((s) => s.trimRight()),
+      stderr: this.stderr.map((s) => s.trimRight()),
+    };
+  }
+}
+
+export class ProcessError extends Error implements LogItem {
+  public result: ProcessResult;
+
+  public constructor(result: ProcessResult) {
+    super();
     this.result = result;
+  }
+
+  public get message(): string {
+    return this.result.getForOutput(Level.Warn);
+  }
+
+  public getForOutput(level: Level): any {
+    return this.result.getForOutput(level);
+  }
+
+  public getForConsole(): any {
+    return this.result.getForConsole();
   }
 }
 
@@ -30,44 +214,12 @@ export type CmdArgs = (string|FilePath)[];
 type Exec = (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv) => Promise<ProcessResult>;
 
 function baseExec(command: string, args: string[], cwd?: FilePath, env?: NodeJS.ProcessEnv): Promise<ProcessResult> {
-  log.debug(`Executing '${command} ${args.join(' ')}'`);
-  return new Promise((resolve, reject) => {
-    let output: ProcessResult = {
-      code: 0,
-      stdout: '',
-      stderr: '',
-    };
-
-    let childProcess: ChildProcess = spawn(command, args, {
-      cwd: cwd ? cwd.toPath() : undefined,
-      env: env || process.env,
-      windowsHide: true,
-      shell: false,
-    });
-
-    childProcess.stdout.on('data', (data) => {
-      output.stdout += data;
-    });
-
-    childProcess.stderr.on('data', (data) => {
-      output.stderr += data;
-    });
-
-    childProcess.on('error', () => {
-      output.code = -1;
-      reject(new ProcessError(`Failed to execute ${command}`, `${command} ${args.join(' ')}`, output));
-    });
-
-    childProcess.on('close', (code) => {
-      if (code === 0) {
-        resolve(output);
-      } else {
-        output.code = code;
-        log.warn(`Executing '${command} ${args.join(' ')}' failed with code ${code}`);
-        reject(new ProcessError(`Failed to execute '${command}'`, `${command} ${args.join(' ')}`, output));
-      }
-    });
-  });
+  return ProcessResult.waitFor(command, args, spawn(command, args, {
+    cwd: cwd ? cwd.toPath() : undefined,
+    env: env || process.env,
+    windowsHide: true,
+    shell: false,
+  }));
 }
 
 let spawnExec: Exec = (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
@@ -85,14 +237,14 @@ let spawnExec: Exec = (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv): 
   if (command) {
     return baseExec(command, cmdArgs, cwd, env);
   }
-  throw new ProcessError('Invalid arguments passed to SpawnExec (no command).');
+  throw new Error('Invalid arguments passed to SpawnExec (no command).');
 };
 
 let mozillaBuildExec: Exec = async (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
   function fixOutput(result: ProcessResult): void {
-    if (result.stdout.startsWith('MozillaBuild Install Directory:')) {
-      let pos: number = result.stdout.indexOf('\n');
-      result.stdout = result.stdout.substring(pos);
+    let start: string = result.stdout[0];
+    if (start.startsWith('MozillaBuild Install Directory:')) {
+      result.removeSubstring(Pipe.StdOut, 0, start.length);
     }
   }
 

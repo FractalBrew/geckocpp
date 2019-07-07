@@ -64,7 +64,20 @@
       "command": "mozillacpp.dumpState",
       "title": "Dump internal state",
       "category": "Mozilla"
+    }, {
+      "command": "mozillacpp.testCompile",
+      "title": "Test compilation of this file.",
+      "category": "Mozilla"
     }],
+    "menus": {
+      "commandPalette": [{
+        "command": "mozillacpp.testCompile",
+        "when": "editorLangId == cpp"
+      }, {
+        "command": "mozillacpp.testCompile",
+        "when": "editorLangId == c"
+      }]
+    },
     "configuration": {
       "type": "object",
       "title": "Mozilla Intellisense",
