@@ -121,7 +121,7 @@ function addCompilerArgumentsToConfig(cmdLine: string|undefined, forceIncludeArg
     if (arg === forceIncludeArg) {
       let include: FilePath|string|undefined = args.shift();
       if (typeof include === 'string') {
-        config.forcedIncludes.add(FilePath.fromPath(include));
+        config.forcedIncludes.add(FilePath.fromUnixy(include));
       }
       continue;
     }
