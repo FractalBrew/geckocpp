@@ -23,31 +23,54 @@ export enum FileType {
   CPP = 'cpp',
 }
 
-export interface Define {
-  key: string;
-  value: string;
-}
+export class Define {
+  private defineKey: string;
+  private defineValue: string|undefined;
 
-function buildDefine(text: string, splitter: string): Define {
-  let pos: number = text.indexOf(splitter);
-  if (pos >= 0) {
-    return {
-      key: text.substring(0, pos),
-      value: text.substring(pos + 1),
-    };
+  private constructor(key: string, value?: string) {
+    this.defineKey = key;
+    this.defineValue = value;
   }
 
-  return {
-    key: text,
-    value: '1',
-  };
+  public static fromCode(code: string): Define {
+    let pos: number = code.indexOf(' ');
+    if (pos >= 0) {
+      return new Define(code.substring(0, pos), code.substring(pos + 1));
+    }
+    return new Define(code);
+  }
+
+  public static fromArgument(argument: string): Define {
+    let pos: number = argument.indexOf('=');
+    if (pos >= 0) {
+      return new Define(argument.substring(0, pos), argument.substring(pos + 1));
+    }
+    return new Define(argument);
+  }
+
+  public get key(): string {
+    return this.defineKey;
+  }
+
+  public get value(): string|undefined {
+    return this.defineValue;
+  }
+
+  public toString(): string {
+    if (this.value) {
+      return `${this.key}=${this.value}`;
+    }
+    return this.key;
+  }
 }
 
 export interface CompileConfig {
   includes: FilePathSet;
-  sysIncludes: FilePathSet;
+  defaultIncludes: FilePathSet;
+  defaultSysIncludes: FilePathSet;
   osxFrameworkIncludes: FilePathSet;
   defines: Map<string, Define>;
+  defaultDefines: Map<string, Define>;
   forcedIncludes: FilePathSet;
   intelliSenseMode: INTELLISENSE_MODES;
   standard: VERSIONS;
@@ -59,9 +82,11 @@ export interface CompileConfig {
 function cloneConfig(config: CompileConfig): CompileConfig {
   return {
     includes: new FilePathSet(config.includes),
-    sysIncludes: new FilePathSet(config.sysIncludes),
+    defaultIncludes: new FilePathSet(config.defaultIncludes),
+    defaultSysIncludes: new FilePathSet(config.defaultSysIncludes),
     osxFrameworkIncludes: new FilePathSet(config.osxFrameworkIncludes),
     defines: new Map(config.defines),
+    defaultDefines: new Map(config.defaultDefines),
     forcedIncludes: new FilePathSet(config.forcedIncludes),
     intelliSenseMode: config.intelliSenseMode,
     standard: config.standard,
@@ -85,7 +110,7 @@ function addCompilerArgumentsToConfig(cmdLine: string|undefined, forceIncludeArg
 
     switch (arg.charAt(1)) {
       case 'D':
-        let define: Define = buildDefine(arg.substring(2), '=');
+        let define: Define = Define.fromArgument(arg.substring(2));
         config.defines.set(define.key, define);
         continue;
       case 'I':
@@ -125,9 +150,11 @@ export abstract class Compiler implements Disposable, StateProvider {
       command: this.command,
       override: await config.getCompiler(this.srcdir.toUri(), this.type),
       includes: Array.from(this.defaults.includes),
-      sysIncludes: Array.from(this.defaults.sysIncludes),
+      defaultIncludes: Array.from(this.defaults.defaultIncludes),
+      defaultSysIncludes: Array.from(this.defaults.defaultSysIncludes),
       osxFrameworkIncludes: Array.from(this.defaults.osxFrameworkIncludes),
-      defines: this.defaults.defines.size,
+      defaultDefines: this.defaults.defaultDefines.size,
+      defines: Array.from(this.defaults.defines.values()).map((d) => d.toString()),
     };
   }
 
@@ -152,10 +179,6 @@ export abstract class Compiler implements Disposable, StateProvider {
     return (await config.getCompiler(this.srcdir.toUri(), this.type)) || this.command.slice(0);
   }
 
-  public getDefaultConfiguration(): CompileConfig {
-    return cloneConfig(this.defaults);
-  }
-
   public getIncludePaths(): FilePathSet {
     let includes: FilePathSet = new FilePathSet();
     function addIncludes(set: FilePathSet): void {
@@ -164,16 +187,17 @@ export abstract class Compiler implements Disposable, StateProvider {
       }
     }
 
-    addIncludes(this.defaults.sysIncludes);
+    addIncludes(this.defaults.defaultSysIncludes);
+    addIncludes(this.defaults.defaultIncludes);
     addIncludes(this.defaults.osxFrameworkIncludes);
     addIncludes(this.defaults.includes);
 
     return new FilePathSet(includes);
   }
 
-  public abstract addCompilerArgumentsToConfig(cmdLine: string|undefined, config: CompileConfig): void;
+  public abstract getConfigForArguments(cmdLine: string|undefined): CompileConfig;
 
-  public abstract compile(config: CompileConfig, source: FilePath): Promise<ProcessResult>;
+  public abstract compile(cmdLine: string|undefined, source: FilePath): Promise<ProcessResult>;
 }
 
 class ClangCompiler extends Compiler {
@@ -198,9 +222,9 @@ class ClangCompiler extends Compiler {
           if (include.endsWith(FRAMEWORK_MARKER)) {
             defaults.osxFrameworkIncludes.add(FilePath.fromPath(include.substring(0, include.length - FRAMEWORK_MARKER.length)));
           } else if (inSysIncludes) {
-            defaults.sysIncludes.add(FilePath.fromPath(include));
+            defaults.defaultSysIncludes.add(FilePath.fromPath(include));
           } else {
-            defaults.includes.add(FilePath.fromPath(include));
+            defaults.defaultIncludes.add(FilePath.fromPath(include));
           }
           continue;
         } else {
@@ -212,8 +236,8 @@ class ClangCompiler extends Compiler {
         inIncludes = true;
         inSysIncludes = line.charAt(9) === '<';
       } else if (line.startsWith('#define ')) {
-        let define: Define = buildDefine(line.substring(8).trim(), ' ');
-        defaults.defines.set(define.key, define);
+        let define: Define = Define.fromCode(line.substring(8).trim());
+        defaults.defaultDefines.set(define.key, define);
       }
     }
   }
@@ -248,17 +272,19 @@ class ClangCompiler extends Compiler {
 
       let defaults: CompileConfig = {
         includes: new FilePathSet(),
-        sysIncludes: new FilePathSet(),
+        defaultIncludes: new FilePathSet(),
+        defaultSysIncludes: new FilePathSet(),
         osxFrameworkIncludes: new FilePathSet(),
         defines: new Map(),
+        defaultDefines: new Map(),
         forcedIncludes: new FilePathSet(),
-        intelliSenseMode: 'clang-x64' as INTELLISENSE_MODES,
+        intelliSenseMode: 'msvc-x64' as INTELLISENSE_MODES,
         standard: type === FileType.C ? C_STANDARD : CPP_STANDARD,
       };
 
       ClangCompiler.parseCompilerDefaults(result.output, defaults);
 
-      if (defaults.defines.size === 0 && !defaults.compilerPath) {
+      if (defaults.defaultDefines.size === 0 && !defaults.compilerPath) {
         throw new Error('Failed to discover compiler defaults.');
       }
   
@@ -269,28 +295,33 @@ class ClangCompiler extends Compiler {
     }
   }
 
-  public addCompilerArgumentsToConfig(cmdLine: string|undefined, config: CompileConfig): void {
+  public getConfigForArguments(cmdLine: string|undefined): CompileConfig {
+    let config: CompileConfig = cloneConfig(this.defaults);
     addCompilerArgumentsToConfig(cmdLine, '-include', config);
+    return config;
   }
 
-  public async compile(compileConfig: CompileConfig, source: FilePath): Promise<ProcessResult> {
+  public async compile(cmdLine: string|undefined, source: FilePath): Promise<ProcessResult> {
+    let compileConfig: CompileConfig = this.getConfigForArguments(cmdLine);
+
     let command: CmdArgs = (await config.getCompiler(source.toUri(), this.type)) || this.command.slice(0);
     if (this.defaults.osxSdk) {
       command.push('-isysroot', this.defaults.osxSdk.toPath());
     }
 
-    command.push('-nobuiltininc', '-undef', '-c', '-Wno-everything');
-
-    for (let include of compileConfig.sysIncludes) {
-      command.push(`-isystem${include.toPath()}`);
+    switch (this.type) {
+      case FileType.CPP:
+        command.push(`-std=${CPP_VERSION}`, '-xc++');
+        break;
+      case FileType.C:
+        command.push(`-std=${C_VERSION}`, '-xc');
+        break;
     }
 
-    for (let include of compileConfig.osxFrameworkIncludes) {
-      command.push(`-iframework${include.toPath()}`);
-    }
+    command.push('-c', '-Wno-everything');
 
     for (let define of compileConfig.defines.values()) {
-      command.push(`-D${define.key}=${define.value}`);
+      command.push(`-D${define}`);
     }
 
     for (let include of compileConfig.includes) {
@@ -348,9 +379,11 @@ class MsvcCompiler extends Compiler {
 
       let defaults: CompileConfig = {
         includes: new FilePathSet(),
-        sysIncludes: new FilePathSet(),
+        defaultIncludes: new FilePathSet(),
+        defaultSysIncludes: new FilePathSet(),
         osxFrameworkIncludes: new FilePathSet(),
         defines: new Map(),
+        defaultDefines: new Map(),
         forcedIncludes: new FilePathSet(),
         intelliSenseMode: compilerType === 'msvc' ? 'msvc-x64' : 'clang-x64' as INTELLISENSE_MODES,
         standard: type === FileType.C ? C_STANDARD : CPP_STANDARD,
@@ -358,7 +391,7 @@ class MsvcCompiler extends Compiler {
 
       ClangCompiler.parseCompilerDefaults(result.output, defaults);
 
-      if (defaults.defines.size === 0 && !defaults.compilerPath) {
+      if (defaults.defaultDefines.size === 0 && !defaults.compilerPath) {
         throw new Error('Failed to discover compiler defaults.');
       }
 
@@ -369,11 +402,48 @@ class MsvcCompiler extends Compiler {
     }
   }
 
-  public addCompilerArgumentsToConfig(cmdLine: string|undefined, config: CompileConfig): void {
+  public getConfigForArguments(cmdLine: string|undefined): CompileConfig {
+    let config: CompileConfig = cloneConfig(this.defaults);
     addCompilerArgumentsToConfig(cmdLine, '-FI', config);
+    return config;
   }
 
-  public async compile(_compileConfig: CompileConfig, _source: FilePath): Promise<ProcessResult> {
-    throw new Error('Test compiling is not yet supported on Windows.');
+  public async compile(cmdLine: string|undefined, source: FilePath): Promise<ProcessResult> {
+    let compileConfig: CompileConfig = this.getConfigForArguments(cmdLine);
+    let command: CmdArgs = (await config.getCompiler(source.toUri(), this.type)) || this.command.slice(0);
+
+    switch (this.type) {
+      case FileType.CPP:
+        command.push(`-std=${CPP_VERSION}`, '-TP');
+        break;
+      case FileType.C:
+        command.push(`-std=${C_VERSION}`, '-TC');
+        break;
+    }
+
+    command.push('-c', '-W0');
+
+    for (let define of compileConfig.defines.values()) {
+      command.push(`-D${define}`);
+    }
+
+    for (let include of compileConfig.includes) {
+      command.push(`-I${include.toPath()}`);
+    }
+
+    for (let include of compileConfig.forcedIncludes) {
+      command.push('-FI', include.toPath());
+    }
+
+    command.push(source.toPath());
+
+    try {
+      return await exec(command, source.parent());
+    } catch (e) {
+      if (e instanceof ProcessError) {
+        return e.result;
+      }
+      throw e;
+    }
   }
 }

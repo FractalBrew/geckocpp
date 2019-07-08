@@ -260,14 +260,12 @@ class RecursiveMakeBuild extends Build {
     switch (type) {
       case '.c': {
         let args: string|undefined = dirConfig.get('COMPUTED_CFLAGS');
-        config = this.cCompiler.getDefaultConfiguration();
-        this.cCompiler.addCompilerArgumentsToConfig(args, config);
+        config = this.cCompiler.getConfigForArguments(args);
         break;
       }
       case '.cpp': {
         let args: string|undefined = dirConfig.get('COMPUTED_CXXFLAGS');
-        config = this.cppCompiler.getDefaultConfiguration();
-        this.cCompiler.addCompilerArgumentsToConfig(args, config);
+        config = this.cppCompiler.getConfigForArguments(args);
         break;
       }
       default:
@@ -279,15 +277,14 @@ class RecursiveMakeBuild extends Build {
 
   public async testCompile(source: FilePath): Promise<void> {
     let type: string = source.extname();
-
-    let config: CompileConfig|undefined = await this.getSourceConfiguration(source);
-    if (!config) {
-      return;
-    }
+    let backend: FilePath = source.parent().rebase(this.srcdir, this.getObjDir()).join('backend.mk');
+    let dirConfig: Map<string, string> = new Map();
+    await parseConfig(backend, dirConfig);
 
     let compiler: Compiler = type === '.c' ? this.cCompiler : this.cppCompiler;
+    let args: string|undefined = dirConfig.get(type === '.c' ? 'COMPUTED_CFLAGS' : 'COMPUTED_CXXFLAGS');
     try {
-      let result: ProcessResult = await compiler.compile(config, source);
+      let result: ProcessResult = await compiler.compile(args, source);
       let output: string = result.exitCode === 0 ?
           `Compiling ${source.toPath()} succeeded:` :
           `Compiling ${source.toPath()} failed with exit code ${result.exitCode}:`;

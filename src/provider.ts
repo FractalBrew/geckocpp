@@ -84,24 +84,31 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
           return undefined;
         }
 
-        function outputDefine(define: Define): string {
-          return `${define.key}=${define.value}`;
-        }
-
-        let includes: string[] = [];
+        let includePath: string[] = [];
         function addIncludes(set: FilePathSet): void {
           for (let include of set) {
-            includes.push(include.toPath());
+            includePath.push(include.toPath());
           }
         }
 
-        addIncludes(compileConfig.sysIncludes);
+        addIncludes(compileConfig.defaultSysIncludes);
+        addIncludes(compileConfig.defaultIncludes);
         addIncludes(compileConfig.osxFrameworkIncludes);
         addIncludes(compileConfig.includes);
 
+        let defines: string[] = [];
+        function addDefines(map: Map<string, Define>): void {
+          for (let define of map.values()) {
+            defines.push(define.toString());
+          }
+        }
+
+        addDefines(compileConfig.defaultDefines);
+        addDefines(compileConfig.defines);
+
         let config: cpptools.SourceFileConfiguration = {
-          includePath: includes,
-          defines: Array.from(compileConfig.defines.values()).map(outputDefine),
+          includePath,
+          defines,
           forcedInclude: Array.from(compileConfig.forcedIncludes).map((p) => p.toPath()),
           intelliSenseMode: compileConfig.intelliSenseMode,
           standard: compileConfig.standard,
