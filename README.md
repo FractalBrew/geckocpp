@@ -61,6 +61,18 @@ though.
    open the command palette and run `C/C++: Change Configuration Provider` and
    then select `Mozilla` from the options.
 
+## Commands
+
+This extension adds a few commands to the command palette. They are generally
+only needed for debugging.
+
+* Reset Intellisense: Tells the C++ extension to rebuild its intellisense
+  configuration.
+* Dump internal state: Opens the output panel and displays a JSON object that
+  holds the extension's current state.
+* Test compilation of this file: Attempts to compile the current file using the
+  detected configuration. Mostly useful to track down bugs.
+
 ## Troubleshooting
 
 If you're seeing issues with strange errors showing up in the editor it is worth
