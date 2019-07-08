@@ -43,6 +43,18 @@ build it is possible for one file to end up depending on definitions or includes
 from another file in the same directory. This cause the file to have errors when
 checked standalone as this extensions does but successfully compile.
 
+## Commands
+
+This extension adds a few commands to the command palette. They are generally
+only needed for debugging.
+
+* `Reset Intellisense`: Tells the C++ extension to rebuild its intellisense
+  configuration.
+* `Dump internal state`: Opens the output panel and displays a JSON object that
+  holds the extension's current state.
+* `Test compilation of this file`: Attempts to compile the current file using the
+  detected configuration. Mostly useful to track down bugs.
+
 ## Known issues
 
 Generally check the [Github issues](https://github.com/FractalBrew/vscode-mozillacpp/issues).
@@ -60,18 +72,6 @@ though.
 3. You may see a pop-up offering to configure intellisense automatically, if not
    open the command palette and run `C/C++: Change Configuration Provider` and
    then select `Mozilla` from the options.
-
-## Commands
-
-This extension adds a few commands to the command palette. They are generally
-only needed for debugging.
-
-* Reset Intellisense: Tells the C++ extension to rebuild its intellisense
-  configuration.
-* Dump internal state: Opens the output panel and displays a JSON object that
-  holds the extension's current state.
-* Test compilation of this file: Attempts to compile the current file using the
-  detected configuration. Mostly useful to track down bugs.
 
 ## Troubleshooting
 
