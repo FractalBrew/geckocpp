@@ -219,8 +219,8 @@ class RecursiveMakeBuild extends Build {
 
     try {
       return new RecursiveMakeBuild(mach, srcdir, environment,
-        await Compiler.create(srcdir, [FilePath.fromPath(cPath)], FileType.C, config),
-        await Compiler.create(srcdir, [FilePath.fromPath(cppPath)], FileType.CPP, config),
+        await Compiler.create(srcdir, [FilePath.fromUnixy(cPath)], FileType.C, config),
+        await Compiler.create(srcdir, [FilePath.fromUnixy(cppPath)], FileType.CPP, config),
       );
     } catch (e) {
       log.error('Failed to find compilers.', e);
