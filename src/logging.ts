@@ -68,11 +68,11 @@ class WrappedLogItem extends LogItemImpl {
 
   public getForOutput(level: Level): string {
     if (typeof this.item === 'object') {
-      if ("getForOutput" in this.item) {
+      if ('getForOutput' in this.item) {
         return this.item.getForOutput(level);
       }
 
-      if ("getForConsole" in this.item) {
+      if ('getForConsole' in this.item) {
         return String(this.item.getForConsole());
       }
     }
@@ -86,11 +86,11 @@ class WrappedLogItem extends LogItemImpl {
 
   public getForConsole(): any {
     if (typeof this.item === 'object') {
-      if ("getForConsole" in this.item) {
+      if ('getForConsole' in this.item) {
         return this.item.getForConsole();
       }
 
-      if ("getForOutput" in this.item) {
+      if ('getForOutput' in this.item) {
         return this.item.getForOutput(Level.Debug);
       }
     }

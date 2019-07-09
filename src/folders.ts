@@ -5,8 +5,8 @@
 import * as vscode from 'vscode';
 
 import { Build } from './build';
-import { CompileConfig, Define } from './compiler';
 import { FilePath, Disposable, StateProvider, FilePathSet } from './shared';
+import { SourceFileConfiguration } from 'vscode-cpptools';
 
 export class SourceFolder implements StateProvider, Disposable {
   public readonly folder: vscode.WorkspaceFolder;
@@ -55,7 +55,7 @@ export class SourceFolder implements StateProvider, Disposable {
     return this.build.getIncludePaths();
   }
 
-  public async getSourceConfiguration(uri: vscode.Uri): Promise<CompileConfig|undefined> {
+  public async getSourceConfiguration(uri: vscode.Uri): Promise<SourceFileConfiguration|undefined> {
     if (!this.build) {
       return Promise.resolve(undefined);
     }

@@ -6,12 +6,14 @@ import * as path from 'path';
 import { Stats, promises as fs } from 'fs';
 
 import * as vscode from 'vscode';
+import { SourceFileConfiguration } from 'vscode-cpptools';
 
 import { log } from './logging';
 import { config } from './config';
 import { ProcessResult, exec, CmdArgs } from './exec';
 import { into, Disposable, StateProvider, FilePath, FilePathSet } from './shared';
-import { Compiler, FileType, CompileConfig } from './compiler';
+import { Compiler, FileType } from './compiler';
+import { bashShellParse } from './shell';
 
 interface MozConfig {
   configure_args: string[];
@@ -144,7 +146,7 @@ export abstract class Build implements Disposable, StateProvider {
 
   public abstract getIncludePaths(): FilePathSet;
 
-  public abstract getSourceConfiguration(path: FilePath): Promise<CompileConfig|undefined>;
+  public abstract getSourceConfiguration(path: FilePath): Promise<SourceFileConfiguration|undefined>;
 
   public abstract testCompile(path: FilePath): Promise<void>;
 }
@@ -249,30 +251,19 @@ class RecursiveMakeBuild extends Build {
     return result;
   }
 
-  public async getSourceConfiguration(source: FilePath): Promise<CompileConfig|undefined> {
+  public async getSourceConfiguration(source: FilePath): Promise<SourceFileConfiguration|undefined> {
     let type: string = source.extname();
     let backend: FilePath = source.parent().rebase(this.srcdir, this.getObjDir()).join('backend.mk');
     let dirConfig: Map<string, string> = new Map();
     await parseConfig(backend, dirConfig);
 
-    let config: CompileConfig|undefined = undefined;
-
-    switch (type) {
-      case '.c': {
-        let args: string|undefined = dirConfig.get('COMPUTED_CFLAGS');
-        config = this.cCompiler.getConfigForArguments(args);
-        break;
-      }
-      case '.cpp': {
-        let args: string|undefined = dirConfig.get('COMPUTED_CXXFLAGS');
-        config = this.cppCompiler.getConfigForArguments(args);
-        break;
-      }
-      default:
-        log.debug(`Asked for configuration for an unknown extension: ${type}`);
+    let args: string|undefined = type === '.c' ? dirConfig.get('COMPUTED_CFLAGS') : dirConfig.get('COMPUTED_CXXFLAGS');
+    if (!args) {
+      return undefined;
     }
 
-    return config;
+    let compiler: Compiler = type === '.c' ? this.cCompiler : this.cppCompiler;
+    return compiler.getSourceConfigForArguments(bashShellParse(args));
   }
 
   public async testCompile(source: FilePath): Promise<void> {
@@ -283,8 +274,12 @@ class RecursiveMakeBuild extends Build {
 
     let compiler: Compiler = type === '.c' ? this.cCompiler : this.cppCompiler;
     let args: string|undefined = dirConfig.get(type === '.c' ? 'COMPUTED_CFLAGS' : 'COMPUTED_CXXFLAGS');
+    if (!args) {
+      return;
+    }
+
     try {
-      let result: ProcessResult = await compiler.compile(args, source);
+      let result: ProcessResult = await compiler.compile(source, bashShellParse(args));
       let output: string = result.exitCode === 0 ?
           `Compiling ${source.toPath()} succeeded:` :
           `Compiling ${source.toPath()} failed with exit code ${result.exitCode}:`;

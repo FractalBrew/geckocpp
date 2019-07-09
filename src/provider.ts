@@ -9,7 +9,6 @@ import { SourceFolder } from './folders';
 import { Workspace } from './workspace';
 import { logItem, log } from './logging';
 import { Disposable, FilePathSet } from './shared';
-import { Define, CompileConfig } from './compiler';
 
 export class MachConfigurationProvider implements cpptools.CustomConfigurationProvider, Disposable {
   private api: cpptools.CppToolsApi;
@@ -78,43 +77,13 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
           return undefined;
         }
 
-        let compileConfig: CompileConfig|undefined = await folder.getSourceConfiguration(uri);
+        let compileConfig: cpptools.SourceFileConfiguration|undefined = await folder.getSourceConfiguration(uri);
         if (compileConfig === undefined) {
           log.warn(`Unable to find configuration for ${uri.fsPath}.`);
           return undefined;
         }
 
-        let includePath: string[] = [];
-        function addIncludes(set: FilePathSet): void {
-          for (let include of set) {
-            includePath.push(include.toPath());
-          }
-        }
-
-        addIncludes(compileConfig.defaultSysIncludes);
-        addIncludes(compileConfig.defaultIncludes);
-        addIncludes(compileConfig.osxFrameworkIncludes);
-        addIncludes(compileConfig.includes);
-
-        let defines: string[] = [];
-        function addDefines(map: Map<string, Define>): void {
-          for (let define of map.values()) {
-            defines.push(define.toString());
-          }
-        }
-
-        addDefines(compileConfig.defaultDefines);
-        addDefines(compileConfig.defines);
-
-        let config: cpptools.SourceFileConfiguration = {
-          includePath,
-          defines,
-          forcedInclude: Array.from(compileConfig.forcedIncludes).map((p) => p.toPath()),
-          intelliSenseMode: compileConfig.intelliSenseMode,
-          standard: compileConfig.standard,
-          compilerPath: compileConfig.compilerPath,
-          windowsSdkVersion: compileConfig.windowsSdkVersion,
-        };
+        let config: cpptools.SourceFileConfiguration = compileConfig;
 
         log.debug(`Returning configuration for ${uri.fsPath}:`, logItem(() => '\n' +
 `includePath: ${JSON.stringify(config.includePath, null, 2)}
