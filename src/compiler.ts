@@ -8,6 +8,7 @@ import { ProcessResult, exec, CmdArgs, ProcessError } from './exec';
 import { log } from './logging';
 import { FilePath, Disposable, StateProvider, FilePathSet } from './shared';
 import { config } from './config';
+import { shellQuote } from './shell';
 
 type VERSIONS = 'c89' | 'c99' | 'c11' | 'c++98' | 'c++03' | 'c++11' | 'c++14' | 'c++17';
 type INTELLISENSE_MODES = 'msvc-x64' | 'gcc-x64' | 'clang-x64';
@@ -249,7 +250,7 @@ export abstract class Compiler implements Disposable, StateProvider {
     return includes;
   }
 
-  public abstract getSourceConfigForArguments(cmdLine: string[]): SourceFileConfiguration;
+  public abstract getSourceConfigForArguments(cmdLine: string[]): Promise<SourceFileConfiguration>;
 
   public abstract compile(source: FilePath, cmdLine: string[]): Promise<ProcessResult>;
 }
@@ -313,7 +314,7 @@ class ClangCompiler extends Compiler {
     }
   }
 
-  public getSourceConfigForArguments(cmdLine: string[]): SourceFileConfiguration {
+  public async getSourceConfigForArguments(cmdLine: string[]): Promise<SourceFileConfiguration> {
     let fileConfig: FileConfig = getFileConfigForArguments(cmdLine, '-include');
 
     let config: SourceFileConfiguration = {
@@ -420,15 +421,18 @@ class MsvcCompiler extends Compiler {
     }
   }
 
-  public getSourceConfigForArguments(cmdLine: string[]): SourceFileConfiguration {
+  public async getSourceConfigForArguments(cmdLine: string[]): Promise<SourceFileConfiguration> {
     let fileConfig: FileConfig = getFileConfigForArguments(cmdLine, '-FI');
 
+    // We rely on cpptools getting the defaults from clang-cl here. We must also use msvc
+    // intellisense mode or cpptools thinks we are a WSL compiler.
     let config: SourceFileConfiguration = {
-      includePath: pathsAsArray(this.defaults.sysIncludes, this.defaults.includes, fileConfig.includes),
-      defines: definesAsArray(this.defaults.defines, fileConfig.defines),
+      includePath: pathsAsArray(fileConfig.includes),
+      defines: definesAsArray(fileConfig.defines),
       forcedInclude: pathsAsArray(fileConfig.forcedIncludes),
-      intelliSenseMode: this.settings.intelliSenseMode,
+      intelliSenseMode: 'msvc-x64',
       standard: this.settings.standard as VERSIONS,
+      compilerPath: shellQuote((await this.getCommand()).map((i) => i.toString())),
     };
 
     return config;
