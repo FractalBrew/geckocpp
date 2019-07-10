@@ -39,9 +39,9 @@ future this extension will try to detect this and warn you that there is an
 issue.
 
 Also note that since Mozilla's build system combines many C++ files together to
-build it is possible for one file to end up depending on definitions or includes
-from another file in the same directory. This cause the file to have errors when
-checked standalone as this extensions does but successfully compile.
+build there are a lot of files that can no longer build standalone since they
+rely on headers included by other files. These issues will show up as problems
+with Visual Studio Code.
 
 ## Commands
 
