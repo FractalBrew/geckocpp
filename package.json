@@ -47,14 +47,14 @@
       "description": "Open pull requests"
     }
   ],
-  "extensionDependency": [
-    "vscode.cpptools"
+  "extensionDependencies": [
+    "ms-vscode.cpptools"
   ],
   "activationEvents": [
     "workspaceContains:mach",
     "onCommand:mozillacpp.resetIntellisense"
   ],
-  "main": "./out/main.js",
+  "main": "./out/main",
   "contributes": {
     "commands": [{
       "command": "mozillacpp.resetIntellisense",
@@ -150,7 +150,9 @@
     "postinstall": "node ./node_modules/vscode/bin/install",
     "test": "mocha test/shell"
   },
-  "dependencies": {},
+  "dependencies": {
+    "vscode-cpptools": "^2.1.2"
+  },
   "devDependencies": {
     "@types/mocha": "^5.2.7",
     "@types/node": "^10.11.0",
@@ -162,7 +164,6 @@
     "typescript": "^3.3.2",
     "vrsource-tslint-rules": "^6.0.0",
     "vscode": "^1.1.28",
-    "vscode-cpptools": "^2.1.2",
     "vscode-jsonrpc": "3.5.0"
   }
 }

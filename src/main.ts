@@ -9,7 +9,7 @@ import { config } from './config';
 import { log } from './logging';
 import { SourceFolder } from './folders';
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
+export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     config,
     log,

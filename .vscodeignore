@@ -1,5 +1,9 @@
 .vscode/**
+out/**/*.map
+src/**
+images/**
+test/**
 .gitignore
 tsconfig.json
 tslint.json
-images
+*.vsix
