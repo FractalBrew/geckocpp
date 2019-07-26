@@ -2,7 +2,7 @@
   "name": "mozillacpp",
   "displayName": "Mozilla C++ Intellisense Provider",
   "description": "A C++ intellisense provider for the Mozilla source code.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "preview": true,
   "publisher": "fractalbrew",
   "author": {
