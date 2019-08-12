@@ -61,7 +61,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
       let folder: SourceFolder|undefined = await this.workspace.getFolder(uri);
       return folder !== undefined && folder.isMozillaSource();
     } catch (e) {
-      log.error('Failed to canProvildeConfiguration.', e);
+      log.error('Failed to canProvideConfiguration.', e);
       return false;
     }
   }

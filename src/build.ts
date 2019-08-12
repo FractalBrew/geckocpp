@@ -238,7 +238,12 @@ class RecursiveMakeBuild extends Build {
     let result: FilePathSet = new FilePathSet();
 
     result.add(this.srcdir);
-    result.add(this.getObjDir());
+
+    let objdir: FilePath = this.getObjDir();
+    result.add(objdir.join("dist", "include"));
+    result.add(objdir.join("dist", "include", "nss"));
+    result.add(objdir.join("dist", "include", "nspr"));
+    result.add(objdir.join("ipc", "ipdl", "_ipdlheaders"));
 
     for (let path of this.cCompiler.getIncludePaths()) {
       result.add(path);
