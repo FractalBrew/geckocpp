@@ -134,6 +134,16 @@ export class FilePath {
     return path.extname(this.toPath());
   }
 
+  public changeType(newType: string): FilePath {
+    let path: string = this.toPath();
+    let ext: string = this.extname();
+    if (ext) {
+      path = path.substring(0, path.length - ext.length);
+    }
+
+    return FilePath.fromPath(`${this.toPath()}.${newType}`);
+  }
+
   public parent(): FilePath {
     return FilePath.fromPath(path.dirname(this.toPath()));
   }
@@ -149,6 +159,33 @@ export class FilePath {
 
   public async stat(): Promise<Stats> {
     return fs.stat(this.toPath());
+  }
+
+  public async exists(): Promise<boolean> {
+    try {
+      await this.stat();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  public async isDirectory(): Promise<boolean> {
+    try {
+      let stats: Stats = await this.stat();
+      return stats.isDirectory();
+    } catch (e) {
+      return false;
+    }
+  }
+
+  public async isFile(): Promise<boolean> {
+    try {
+      let stats: Stats = await this.stat();
+      return stats.isFile();
+    } catch (e) {
+      return false;
+    }
   }
 
   public toString(): string {

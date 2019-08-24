@@ -262,6 +262,10 @@ class RecursiveMakeBuild extends Build {
     let dirConfig: Map<string, string> = new Map();
     await parseConfig(backend, dirConfig);
 
+    if (type === '.h' && source.changeType('c').isFile()) {
+      type = '.c';
+    }
+
     let args: string|undefined = type === '.c' ? dirConfig.get('COMPUTED_CFLAGS') : dirConfig.get('COMPUTED_CXXFLAGS');
     if (!args) {
       return undefined;
