@@ -18,7 +18,7 @@ export class MachConfigurationProvider implements cpptools.CustomConfigurationPr
   public extensionId: string = 'fractalbrew.mozillacpp';
 
   public static async create(workspace: Workspace): Promise<MachConfigurationProvider|null> {
-    let api: cpptools.CppToolsApi|undefined = await cpptools.getCppToolsApi(cpptools.Version.v2);
+    let api: cpptools.CppToolsApi|undefined = await cpptools.getCppToolsApi(cpptools.Version.v3);
     if (api) {
       return new MachConfigurationProvider(api, workspace);
     }
@@ -142,6 +142,38 @@ windowsSdkVersion: ${config.windowsSdkVersion}`.split('\n').map((s) => '  ' + s)
       return config;
     } catch (e) {
       log.error('Failed to provideBrowseConfiguration.', e);
+      throw(e);
+    }
+  }
+
+  public async canProvideBrowseConfigurationsPerFolder(): Promise<boolean> {
+    try {
+      return this.workspace.canProvideConfig();
+    } catch (e) {
+      log.error('Failed to canProvideBrowseConfigurationsPerFolder.', e);
+      return false;
+    }
+  }
+
+  public async provideFolderBrowseConfiguration(uri: vscode.Uri): Promise<cpptools.WorkspaceBrowseConfiguration> {
+    let start: number = Date.now();
+    try {
+      let folder: SourceFolder|undefined = await this.workspace.getFolder(uri);
+      if (!folder || !await folder.isMozillaSource()) {
+        log.warn(`Asked for a configuration for a non-Mozilla folder: ${uri.fsPath}`);
+        return {
+          browsePath: [],
+        };
+      }
+
+      let config: cpptools.WorkspaceBrowseConfiguration = {
+        browsePath: Array.from(folder.getIncludePaths()).map((p) => p.toPath()),
+      };
+
+      log.debug(`Returned folder browse configuration in ${Date.now() - start}ms`, config);
+      return config;
+    } catch (e) {
+      log.error('Failed to provideFolderBrowseConfiguration.', e);
       throw(e);
     }
   }
