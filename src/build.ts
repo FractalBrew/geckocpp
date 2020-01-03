@@ -7,11 +7,12 @@ import { Stats, promises as fs } from 'fs';
 
 import * as vscode from 'vscode';
 import { SourceFileConfiguration } from 'vscode-cpptools';
+import { JsonDecoder } from 'ts.data.json';
 
 import { log } from './logging';
 import { config } from './config';
 import { ProcessResult, exec, CmdArgs } from './exec';
-import { into, Disposable, StateProvider, FilePath, FilePathSet } from './shared';
+import { Disposable, StateProvider, FilePath, FilePathSet } from './shared';
 import { Compiler, FileType } from './compiler';
 import { bashShellParse } from './shell';
 
@@ -22,25 +23,27 @@ interface MozConfig {
   path: string;
 }
 
+let mozConfigDecoder: JsonDecoder.Decoder<MozConfig> = JsonDecoder.object<MozConfig>({
+  configure_args: JsonDecoder.array(JsonDecoder.string, "string[]"),
+  make_extra: JsonDecoder.array(JsonDecoder.string, "string[]"),
+  make_flags: JsonDecoder.array(JsonDecoder.string, "string[]"),
+  path: JsonDecoder.string,
+}, "MozConfig");
+
 interface MachEnvironment {
   mozconfig: MozConfig;
-  topobjdir: '';
-  topsrcdir: '';
+  topobjdir: string;
+  topsrcdir: string;
 }
 
-function intoEnvironment(json: any): MachEnvironment {
-  let template: MachEnvironment = {
-    mozconfig: {
-      configure_args: [''],
-      make_extra: [''],
-      make_flags: [''],
-      path: '',
-    },
-    topobjdir: '',
-    topsrcdir: '',
-  };
+let machEnvironmentDecoder: JsonDecoder.Decoder<MachEnvironment> = JsonDecoder.object<MachEnvironment>({
+  mozconfig: mozConfigDecoder,
+  topobjdir: JsonDecoder.string,
+  topsrcdir: JsonDecoder.string,
+}, "MachEnvironment");
 
-  return into(json, template);
+function intoEnvironment(json: any): Promise<MachEnvironment> {
+  return machEnvironmentDecoder.decodePromise(json);
 }
 
 class Mach implements Disposable, StateProvider {

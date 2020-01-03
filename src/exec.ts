@@ -69,23 +69,27 @@ export class ProcessResult extends LogItemImpl {
       log.debug(`Executing '${result.printableCommand()}'`);
       let seenError: boolean = false;
 
-      childProcess.stdout.setEncoding('utf8');
-      childProcess.stdout.on('data', (data) => {
-        if (seenError) {
-          return;
-        }
+      if (childProcess.stdout) {
+        childProcess.stdout.setEncoding('utf8');
+        childProcess.stdout.on('data', (data) => {
+          if (seenError) {
+            return;
+          }
 
-        result.addOutput(Pipe.StdOut, data);
-      });
+          result.addOutput(Pipe.StdOut, data);
+        });
+      }
 
-      childProcess.stderr.setEncoding('utf8');
-      childProcess.stderr.on('data', (data) => {
-        if (seenError) {
-          return;
-        }
+      if (childProcess.stderr) {
+        childProcess.stderr.setEncoding('utf8');
+        childProcess.stderr.on('data', (data) => {
+          if (seenError) {
+            return;
+          }
 
-        result.addOutput(Pipe.StdErr, data);
-      });
+          result.addOutput(Pipe.StdErr, data);
+        });
+      }
 
       childProcess.on('error', (err: Error) => {
         seenError = true;
