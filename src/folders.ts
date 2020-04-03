@@ -2,15 +2,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
+import { SourceFileConfiguration } from "vscode-cpptools";
 
-import { Build } from './build';
-import { FilePath, Disposable, StateProvider, FilePathSet } from './shared';
-import { SourceFileConfiguration } from 'vscode-cpptools';
+import { Build, BuildState } from "./build";
+import { FilePath, Disposable, StateProvider, FilePathSet } from "./shared";
+
+export interface SourceFolderState {
+  root: string;
+  build: BuildState | null;
+}
 
 export class SourceFolder implements StateProvider, Disposable {
   public readonly folder: vscode.WorkspaceFolder;
-  private build: Build|undefined;
+  private build: Build | undefined;
 
   public get root(): vscode.Uri {
     return this.folder.uri;
@@ -20,12 +25,12 @@ export class SourceFolder implements StateProvider, Disposable {
     return new SourceFolder(folder, await Build.create(folder.uri));
   }
 
-  private constructor(folder: vscode.WorkspaceFolder, build: Build|undefined) {
+  private constructor(folder: vscode.WorkspaceFolder, build: Build | undefined) {
     this.folder = folder;
     this.build = build;
   }
 
-  public async toState(): Promise<any> {
+  public async toState(): Promise<SourceFolderState> {
     return {
       root: this.folder.uri.toString(),
       build: this.build ? await this.build.toState() : null,
@@ -33,6 +38,7 @@ export class SourceFolder implements StateProvider, Disposable {
   }
 
   public dispose(): void {
+    // Nothing to do.
   }
 
   public isMozillaSource(): boolean {
@@ -55,7 +61,8 @@ export class SourceFolder implements StateProvider, Disposable {
     return this.build.getIncludePaths();
   }
 
-  public async getSourceConfiguration(uri: vscode.Uri): Promise<SourceFileConfiguration|undefined> {
+  public async getSourceConfiguration(uri: vscode.Uri):
+  Promise<SourceFileConfiguration | undefined> {
     if (!this.build) {
       return Promise.resolve(undefined);
     }
@@ -70,5 +77,4 @@ export class SourceFolder implements StateProvider, Disposable {
 
     return this.build.testCompile(FilePath.fromUri(uri));
   }
-
 }

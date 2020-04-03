@@ -2,20 +2,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { ChildProcess, spawn } from 'child_process';
+import { ChildProcess, spawn } from "child_process";
 
-import { log, LogItem, LogItemImpl } from './logging';
-import { config, Level } from './config';
-import { FilePath } from './shared';
-import { bashShellQuote } from './shell';
+import { config, Level } from "./config";
+import { log, LogItem, LogItemImpl } from "./logging";
+import { FilePath } from "./shared";
+import { bashShellQuote } from "./shell";
 
 function lineSplit(data: string): string[] {
   let results: string[] = [];
-  let lineStart: number = 0;
+  let lineStart = 0;
 
-  let i: number = 0;
+  let i = 0;
   while (i < data.length) {
-    if (data.charAt(i) === '\n') {
+    if (data.charAt(i) === "\n") {
       results.push(data.substring(lineStart, i + 1));
       lineStart = i + 1;
     }
@@ -49,8 +49,8 @@ export class ProcessResult extends LogItemImpl {
 
   private constructor(command: string, args: string[]) {
     super();
-    this.command = command,
-    this.args = args,
+    this.command = command;
+    this.args = args;
     this.processExitCode = 0;
     this.processOutput = [];
   }
@@ -63,71 +63,74 @@ export class ProcessResult extends LogItemImpl {
     this.processOutput.push({ pipe, data });
   }
 
-  public static async waitFor(command: string, args: string[], childProcess: ChildProcess): Promise<ProcessResult> {
-    return new Promise((resolve, reject) => {
-      let result: ProcessResult = new ProcessResult(command, args);
-      log.debug(`Executing '${result.printableCommand()}'`);
-      let seenError: boolean = false;
+  public static async waitFor(command: string, args: string[], childProcess: ChildProcess):
+  Promise<ProcessResult> {
+    return new Promise(
+      (resolve: (result: ProcessResult) => void, reject: (error: ProcessError) => void): void => {
+        let result: ProcessResult = new ProcessResult(command, args);
+        log.debug(`Executing '${result.printableCommand()}'`);
+        let seenError = false;
 
-      if (childProcess.stdout) {
-        childProcess.stdout.setEncoding('utf8');
-        childProcess.stdout.on('data', (data) => {
-          if (seenError) {
-            return;
-          }
+        if (childProcess.stdout) {
+          childProcess.stdout.setEncoding("utf8");
+          childProcess.stdout.on("data", (data: string): void => {
+            if (seenError) {
+              return;
+            }
 
-          result.addOutput(Pipe.StdOut, data);
-        });
-      }
-
-      if (childProcess.stderr) {
-        childProcess.stderr.setEncoding('utf8');
-        childProcess.stderr.on('data', (data) => {
-          if (seenError) {
-            return;
-          }
-
-          result.addOutput(Pipe.StdErr, data);
-        });
-      }
-
-      childProcess.on('error', (err: Error) => {
-        seenError = true;
-        result.processExitCode = -1;
-        result.processError = err;
-        reject(new ProcessError(result));
-      });
-
-      childProcess.on('close', (code) => {
-        if (seenError) {
-          return;
+            result.addOutput(Pipe.StdOut, data);
+          });
         }
 
-        if (code === 0) {
-          resolve(result);
-        } else {
-          result.processExitCode = code;
+        if (childProcess.stderr) {
+          childProcess.stderr.setEncoding("utf8");
+          childProcess.stderr.on("data", (data: string): void => {
+            if (seenError) {
+              return;
+            }
+
+            result.addOutput(Pipe.StdErr, data);
+          });
+        }
+
+        childProcess.on("error", (err: Error): void => {
+          seenError = true;
+          result.processExitCode = -1;
+          result.processError = err;
           reject(new ProcessError(result));
-        }
-      });
-    });
+        });
+
+        childProcess.on("close", (code: number): void => {
+          if (seenError) {
+            return;
+          }
+
+          if (code === 0) {
+            resolve(result);
+          } else {
+            result.processExitCode = code;
+            reject(new ProcessError(result));
+          }
+        });
+      },
+    );
   }
 
   private combineParts(parts: ProcessOutput[]): string[] {
-    return lineSplit(parts.reduce((value: string, current: ProcessOutput) => {
+    return lineSplit(parts.reduce((value: string, current: ProcessOutput): string => {
       return value + current.data;
-    }, ''));
+    }, ""));
   }
 
   public printableCommand(): string {
     if (this.args.length > 10) {
-      return `${this.command} ${this.args.slice(0, 9).join(' ')} ...`;
+      return `${this.command} ${this.args.slice(0, 9).join(" ")} ...`;
     }
-    return `${this.command} ${this.args.join(' ')}`;
+    return `${this.command} ${this.args.join(" ")}`;
   }
 
   public removeSubstring(pipe: Pipe, start: number, end: number): void {
-    let i: number = 0;
+    let i = 0;
     while (i < this.processOutput.length && start >= 0 && end >= 0) {
       let output: ProcessOutput = this.processOutput[i];
       if (output.pipe !== pipe) {
@@ -157,11 +160,15 @@ export class ProcessResult extends LogItemImpl {
   }
 
   public get stderr(): string[] {
-    return this.combineParts(this.processOutput.filter((o) => o.pipe === Pipe.StdErr));
+    return this.combineParts(this.processOutput.filter((o: ProcessOutput): boolean => {
+      return o.pipe === Pipe.StdErr;
+    }));
   }
 
   public get stdout(): string[] {
-    return this.combineParts(this.processOutput.filter((o) => o.pipe === Pipe.StdOut));
+    return this.combineParts(this.processOutput.filter((o: ProcessOutput): boolean => {
+      return o.pipe === Pipe.StdOut;
+    }));
   }
 
   public get output(): string[] {
@@ -169,7 +176,7 @@ export class ProcessResult extends LogItemImpl {
   }
 
   public getForOutput(level: Level): string {
-    let output: string = '';
+    let output = "";
     if (this.processError) {
       output += `Execution of ${this.printableCommand()} failed: ${this.processError.message}.`;
     } else {
@@ -177,18 +184,18 @@ export class ProcessResult extends LogItemImpl {
     }
 
     if (level <= Level.Log) {
-      output += `\n${this.output.join('')}`;
+      output += `\n${this.output.join("")}`;
     }
 
     return output;
   }
 
-  public getForConsole(): any {
+  public getForConsole(): unknown {
     return {
       command: this.printableCommand(),
       exitCode: this.exitCode,
-      stdout: this.stdout.map((s) => s.trimRight()),
-      stderr: this.stderr.map((s) => s.trimRight()),
+      stdout: this.stdout.map((s: string): string => s.trimRight()),
+      stderr: this.stderr.map((s: string): string => s.trimRight()),
     };
   }
 }
@@ -205,29 +212,31 @@ export class ProcessError extends Error implements LogItem {
     return this.result.getForOutput(Level.Warn);
   }
 
-  public getForOutput(level: Level): any {
+  public getForOutput(level: Level): string {
     return this.result.getForOutput(level);
   }
 
-  public getForConsole(): any {
+  public getForConsole(): unknown {
     return this.result.getForConsole();
   }
 }
 
-export type CmdArgs = (string|FilePath)[];
-type Exec = (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv) => Promise<ProcessResult>;
+export type CmdArg = string | FilePath;
+type Exec = (args: CmdArg[], cwd?: FilePath, env?: NodeJS.ProcessEnv) => Promise<ProcessResult>;
 
-function baseExec(command: string, args: string[], cwd?: FilePath, env?: NodeJS.ProcessEnv): Promise<ProcessResult> {
+function baseExec(command: string, args: string[], cwd?: FilePath, env?: NodeJS.ProcessEnv):
+Promise<ProcessResult> {
   return ProcessResult.waitFor(command, args, spawn(command, args, {
     cwd: cwd ? cwd.toPath() : undefined,
-    env: env || process.env,
+    env: env ?? process.env,
     windowsHide: true,
     shell: false,
   }));
 }
 
-let spawnExec: Exec = (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
-  function convertArg(arg: string|FilePath): string {
+let spawnExec = (args: CmdArg[], cwd?: FilePath, env?: NodeJS.ProcessEnv):
+Promise<ProcessResult> => {
+  function convertArg(arg: string | FilePath): string {
     if (arg instanceof FilePath) {
       return arg.toPath();
     }
@@ -236,37 +245,37 @@ let spawnExec: Exec = (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv): 
   }
 
   let cmdArgs: string[] = args.map(convertArg);
-  let command: string|undefined = cmdArgs.shift();
+  let command: string | undefined = cmdArgs.shift();
 
   if (command) {
     return baseExec(command, cmdArgs, cwd, env);
   }
-  throw new Error('Invalid arguments passed to SpawnExec (no command).');
+  throw new Error("Invalid arguments passed to SpawnExec (no command).");
 };
 
-let mozillaBuildExec: Exec = async (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
+let mozillaBuildExec = async(args: CmdArg[], cwd?: FilePath, env?: NodeJS.ProcessEnv):
+Promise<ProcessResult> => {
   function fixOutput(result: ProcessResult): void {
-    let start: string = result.stdout[0];
-    if (start.startsWith('MozillaBuild Install Directory:')) {
+    let [start] = result.stdout;
+    if (start.startsWith("MozillaBuild Install Directory:")) {
       result.removeSubstring(Pipe.StdOut, 0, start.length);
     }
   }
 
   let mozillaBuild: FilePath = config.getMozillaBuild();
-  env = Object.assign({
-    MOZILLABUILD: mozillaBuild.toPath() + '\\',
-  }, env);
+  env = Object.assign({ MOZILLABUILD: mozillaBuild.toPath() + "\\" }, env);
 
-  let shellCmd: string = bashShellQuote(args.map((part) => {
+  let shellCmd: string = bashShellQuote(args.map((part: CmdArg): string => {
     if (part instanceof FilePath) {
       return part.toUnixy();
     }
     return part;
   }));
-  let command: string = mozillaBuild.join('msys', 'bin', 'bash.exe').toPath();
+  let command: string = mozillaBuild.join("msys", "bin", "bash.exe").toPath();
 
   try {
-    let result: ProcessResult = await baseExec(command, ['--login', '-i', '-c', shellCmd], cwd, env);
+    let result: ProcessResult =
+      await baseExec(command, ["--login", "-i", "-c", shellCmd], cwd, env);
     fixOutput(result);
     return result;
   } catch (e) {
@@ -275,7 +284,8 @@ let mozillaBuildExec: Exec = async (args: CmdArgs, cwd?: FilePath, env?: NodeJS.
   }
 };
 
-export let exec: Exec = (args: CmdArgs, cwd?: FilePath, env?: NodeJS.ProcessEnv): Promise<ProcessResult> => {
-  let internal: Exec = process.platform === 'win32' ? mozillaBuildExec : spawnExec;
+export let exec = (args: CmdArg[], cwd?: FilePath, env?: NodeJS.ProcessEnv):
+Promise<ProcessResult> => {
+  let internal: Exec = process.platform === "win32" ? mozillaBuildExec : spawnExec;
   return internal(args, cwd, env);
 };

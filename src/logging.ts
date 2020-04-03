@@ -2,16 +2,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import { Level, config } from './config';
-import { FilePath, Disposable, StateProvider } from './shared';
+import { Level, config } from "./config";
+import { FilePath, Disposable, StateProvider } from "./shared";
 
 type LogItemGetter = (level: Level) => string;
 
-function intoPrimitive(value: any): any {
+type Primitive = null | undefined | string | boolean | number | bigint | symbol | object;
+
+function intoPrimitive(value: unknown): Primitive | Primitive[] {
   if (Array.isArray(value)) {
-    return value.map((v) => intoPrimitive(v));
+    return value.map((v: unknown): Primitive => intoPrimitive(v));
   }
 
   if (value === null) {
@@ -27,70 +29,87 @@ function intoPrimitive(value: any): any {
   }
 
   switch (typeof value) {
-    case 'string':
-    case 'undefined':
-    case 'boolean':
-    case 'number':
-    case 'bigint':
-    case 'symbol':
+    case "string":
+    case "undefined":
+    case "boolean":
+    case "number":
+    case "bigint":
+    case "symbol":
       return value;
-    default:
+    default: {
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      let obj = value as any;
       let result: any = {};
-      for (let key of Object.keys(value)) {
-        result[key] = intoPrimitive(value[key]);
+      for (let key of Object.keys(obj)) {
+        result[key] = intoPrimitive(obj[key]);
       }
       return result;
+      /* eslint-enable @typescript-eslint/no-explicit-any */
+    }
   }
 }
 
-export interface LogItem {
+interface LogItemForOutput {
   getForOutput(level: Level): string;
-  getForConsole(): any;
 }
+
+function isForOutput(item: unknown): item is LogItemForOutput {
+  return typeof item == "object" && item != null && "getForOutput" in item;
+}
+
+interface LogItemForConsole {
+  getForConsole(): unknown;
+}
+
+function isForConsole(item: unknown): item is LogItemForConsole {
+  return typeof item == "object" && item != null && "getForConsole" in item;
+}
+
+export type LogItem = LogItemForConsole & LogItemForOutput;
 
 export abstract class LogItemImpl implements LogItem {
   public getForOutput(_level: Level): string {
-    return this.getForConsole();
+    return String(this.getForConsole());
   }
 
-  public getForConsole(): string {
+  public getForConsole(): unknown {
     return this.getForOutput(Level.Debug);
   }
 }
 
 class WrappedLogItem extends LogItemImpl {
-  private item: any;
+  private item: unknown;
 
-  public constructor(item: any) {
+  public constructor(item: unknown) {
     super();
     this.item = item;
   }
 
   public getForOutput(level: Level): string {
-    if (typeof this.item === 'object') {
-      if ('getForOutput' in this.item) {
+    if (this.item && typeof this.item === "object") {
+      if (isForOutput(this.item)) {
         return this.item.getForOutput(level);
       }
 
-      if ('getForConsole' in this.item) {
+      if (isForConsole(this.item)) {
         return String(this.item.getForConsole());
       }
     }
 
-    let result: any = intoPrimitive(this.item);
-    if (typeof result === 'object') {
+    let result = intoPrimitive(this.item);
+    if (typeof result === "object") {
       return JSON.stringify(result, null, 2);
     }
     return String(result);
   }
 
-  public getForConsole(): any {
-    if (typeof this.item === 'object') {
-      if ('getForConsole' in this.item) {
+  public getForConsole(): unknown {
+    if (typeof this.item === "object") {
+      if (isForConsole(this.item)) {
         return this.item.getForConsole();
       }
 
-      if ('getForOutput' in this.item) {
+      if (isForOutput(this.item)) {
         return this.item.getForOutput(Level.Debug);
       }
     }
@@ -99,7 +118,7 @@ class WrappedLogItem extends LogItemImpl {
   }
 }
 
-function asLogItem(item: any): LogItem {
+function asLogItem(item: unknown): LogItem {
   if (item instanceof LogItemImpl) {
     return item;
   }
@@ -109,10 +128,10 @@ function asLogItem(item: any): LogItem {
 
 class ComposedLogItem extends LogItemImpl {
   private getter: LogItemGetter;
-  private actual: any|undefined;
-  private got: string|undefined;
+  private actual: unknown | undefined;
+  private got: string | undefined;
 
-  public constructor(getter: LogItemGetter, actual?: any) {
+  public constructor(getter: LogItemGetter, actual?: unknown) {
     super();
     this.getter = getter;
     this.actual = actual;
@@ -126,7 +145,7 @@ class ComposedLogItem extends LogItemImpl {
     return this.got = this.getter(level);
   }
 
-  public getForConsole(): any {
+  public getForConsole(): unknown {
     if (this.actual) {
       return this.actual;
     }
@@ -135,7 +154,7 @@ class ComposedLogItem extends LogItemImpl {
   }
 }
 
-export function logItem(getter: LogItemGetter, actual?: any): LogItem {
+export function logItem(getter: LogItemGetter, actual?: unknown): LogItem {
   return new ComposedLogItem(getter, actual);
 }
 
@@ -171,11 +190,11 @@ class Logger implements Disposable {
     }
   }
 
-  private output(level: Level, ...args: any[]): void {
+  private output(level: Level, ...args: unknown[]): void {
     let levelstr: string = Level[level];
     let logItems: LogItem[] = args.map(asLogItem);
 
-    let consoleArgs: any[] = logItems.map((l) => l.getForConsole());
+    let consoleArgs: unknown[] = logItems.map((l: LogItem): unknown => l.getForConsole());
 
     switch (level) {
       case Level.Warn:
@@ -195,31 +214,32 @@ class Logger implements Disposable {
 
     let outputLevel: Level = config.getLogLevel();
 
-    this.writeOutput(this.shouldOpen(level), `${levelstr}: ${logItems.map((a) => a.getForOutput(outputLevel)).join(' ')}`);
+    let intoString = (a: LogItem): string => a.getForOutput(outputLevel);
+    this.writeOutput(this.shouldOpen(level), `${levelstr}: ${logItems.map(intoString).join(" ")}`);
   }
 
   public async dumpState(obj: StateProvider): Promise<void> {
     let state: LogItem = asLogItem(await obj.toState());
-    console.log('Current state', state.getForConsole());
+    console.log("Current state", state.getForConsole());
 
     this.writeOutput(true, `Mozilla intellisense state: ${state.getForOutput(Level.Debug)}`);
   }
 
-  public debug(...args: any[]): void {
+  public debug(...args: unknown[]): void {
     this.output(Level.Debug, ...args);
   }
 
-  public log(...args: any[]): void {
+  public log(...args: unknown[]): void {
     this.output(Level.Log, ...args);
   }
 
-  public warn(...args: any[]): void {
+  public warn(...args: unknown[]): void {
     this.output(Level.Warn, ...args);
   }
 
-  public error(...args: any[]): void {
+  public error(...args: unknown[]): void {
     this.output(Level.Error, ...args);
   }
 }
 
-export let log: Logger = new Logger('Mozilla Intellisense');
+export let log: Logger = new Logger("Mozilla Intellisense");

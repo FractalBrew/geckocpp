@@ -2,33 +2,44 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import { SourceFolder } from './folders';
-import { MachConfigurationProvider } from './provider';
-import { log } from './logging';
-import { StateProvider, Disposable } from './shared';
+import { SourceFolder, SourceFolderState } from "./folders";
+import { log } from "./logging";
+import { MachConfigurationProvider } from "./provider";
+import { StateProvider, Disposable } from "./shared";
+
+interface WorkspaceState {
+  mozillaCount: number;
+  folders: SourceFolderState[];
+}
 
 export class Workspace implements StateProvider, Disposable {
-  private mozillaCount: number = 0;
+  private mozillaCount = 0;
   private folders: Map<vscode.Uri, Promise<SourceFolder>>;
-  private provider: MachConfigurationProvider|null = null;
+  private provider: MachConfigurationProvider | null = null;
 
   public constructor() {
     this.folders = new Map();
 
-    let folders: vscode.WorkspaceFolder[]|undefined = vscode.workspace.workspaceFolders;
+    let folders: readonly vscode.WorkspaceFolder[] | undefined = vscode.workspace.workspaceFolders;
     if (folders) {
-      folders.map((f) => this.addFolder(f));
+      folders.forEach((f: vscode.WorkspaceFolder): void => {
+        this.addFolder(f);
+      });
     }
 
-    vscode.workspace.onDidChangeWorkspaceFolders(() => this.workspaceChanged);
+    let listener = (event: vscode.WorkspaceFoldersChangeEvent): void => {
+      this.workspaceChanged(event);
+    };
+    vscode.workspace.onDidChangeWorkspaceFolders(listener);
   }
 
-  public async toState(): Promise<any> {
+  public async toState(): Promise<WorkspaceState> {
     return {
       mozillaCount: this.mozillaCount,
-      folders: await Promise.all((await Promise.all(this.folders.values())).map((f) => f.toState())),
+      folders: await Promise.all((await Promise.all(this.folders.values()))
+        .map((f: SourceFolder): Promise<SourceFolderState> => f.toState())),
     };
   }
 
@@ -38,7 +49,7 @@ export class Workspace implements StateProvider, Disposable {
     }
 
     for (let folder of this.folders.values()) {
-      folder.then((f) => f.dispose());
+      folder.then((f: SourceFolder): void => f.dispose());
     }
     this.folders.clear();
   }
@@ -60,7 +71,7 @@ export class Workspace implements StateProvider, Disposable {
   }
 
   public async rebuildFolders(folders: SourceFolder[]): Promise<void> {
-    await Promise.all(folders.map((f) => this.rebuildFolder(f)));
+    await Promise.all(folders.map((f: SourceFolder): Promise<void> => this.rebuildFolder(f)));
 
     if (this.mozillaCount > 0 && !this.provider) {
       this.provider = await MachConfigurationProvider.create(this);
@@ -88,9 +99,9 @@ export class Workspace implements StateProvider, Disposable {
   }
 
   private async removeFolder(wFolder: vscode.WorkspaceFolder): Promise<void> {
-    let promise: Promise<SourceFolder>|undefined = this.folders.get(wFolder.uri);
+    let promise: Promise<SourceFolder>| undefined = this.folders.get(wFolder.uri);
     if (!promise) {
-      log.warn('Attempted to remove an unknown workspace folder.');
+      log.warn("Attempted to remove an unknown workspace folder.");
       return;
     }
 
@@ -105,12 +116,16 @@ export class Workspace implements StateProvider, Disposable {
   }
 
   private workspaceChanged(event: vscode.WorkspaceFoldersChangeEvent): void {
-    event.added.map((f) => this.addFolder(f));
-    event.removed.map((f) => this.removeFolder(f));
+    event.added.forEach((f: vscode.WorkspaceFolder): void => {
+      this.addFolder(f);
+    });
+    event.removed.forEach((f: vscode.WorkspaceFolder): void => {
+      this.removeFolder(f);
+    });
   }
 
-  public async getFolder(uri: vscode.Uri): Promise<SourceFolder|undefined> {
-    let wFolder: vscode.WorkspaceFolder|undefined = vscode.workspace.getWorkspaceFolder(uri);
+  public async getFolder(uri: vscode.Uri): Promise<SourceFolder | undefined> {
+    let wFolder: vscode.WorkspaceFolder | undefined = vscode.workspace.getWorkspaceFolder(uri);
     if (wFolder) {
       return this.folders.get(wFolder.uri);
     }
@@ -122,11 +137,12 @@ export class Workspace implements StateProvider, Disposable {
   }
 
   public async getMozillaFolders(): Promise<SourceFolder[]> {
-    return (await Promise.all(this.folders.values())).filter((f) => f.isMozillaSource());
+    return (await Promise.all(this.folders.values()))
+      .filter((f: SourceFolder): boolean => f.isMozillaSource());
   }
 
-  public async canProvideConfig(): Promise<boolean> {
-    return this.mozillaCount > 0;
+  public canProvideConfig(): Promise<boolean> {
+    return Promise.resolve(this.mozillaCount > 0);
   }
 
   public resetConfiguration(): void {

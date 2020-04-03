@@ -17,7 +17,7 @@
   },
   "homepage": "https://github.com/FractalBrew/vscode-mozillacpp/blob/master/README.md",
   "engines": {
-    "vscode": "^1.35.0"
+    "vscode": "^1.43.0"
   },
   "categories": [
     "Programming Languages"
@@ -154,8 +154,8 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "postinstall": "node ./node_modules/vscode/bin/install",
-    "test": "mocha test/shell"
+    "test": "mocha test/shell",
+    "lint": "eslint --ext .ts,.js ."
   },
   "dependencies": {
     "ts.data.json": "^1.1.0",
@@ -165,13 +165,17 @@
     "@types/mocha": "^7.0.2",
     "@types/node": "^13.11.0",
     "@types/shell-quote": "^1.6.1",
+    "@types/vscode": "^1.43.0",
+    "@typescript-eslint/eslint-plugin": "^2.26.0",
+    "@typescript-eslint/eslint-plugin-tslint": "^2.26.0",
+    "@typescript-eslint/parser": "^2.26.0",
+    "eslint": "^6.8.0",
+    "eslint-import-resolver-ts": "^0.4.2",
+    "eslint-plugin-import": "^2.20.2",
+    "eslint-plugin-mossop": "github:Mossop/eslint-plugin-mossop#1.0.4",
     "expect": "^25.2.7",
     "mocha": "^7.1.1",
-    "tslint": "^6.1.1",
-    "tslint-microsoft-contrib": "^6.2.0",
     "typescript": "^3.8.3",
-    "vrsource-tslint-rules": "^6.0.0",
-    "vscode": "^1.1.36",
     "vscode-jsonrpc": "5.0.1"
   }
 }

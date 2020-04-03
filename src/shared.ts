@@ -2,17 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import * as path from 'path';
-import { promises as fs, Stats } from 'fs';
+import { promises as fs, Stats } from "fs";
+import * as path from "path";
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
 export interface Disposable {
   dispose(): void;
 }
 
 export interface StateProvider {
-  toState(): Promise<any>;
+  toState(): Promise<unknown>;
 }
 
 abstract class TranslatedSet<B, R> {
@@ -74,8 +74,9 @@ abstract class TranslatedSet<B, R> {
     }
   }
 
-  public forEach(callback: (value: R, key: R, set: this) => any, thisArg?: any): void {
-    this.set.forEach((base: B) => {
+  public forEach(callback: (value: R, key: R, set: TranslatedSet<B, R>) => void, thisArg: unknown):
+  void {
+    this.set.forEach((base: B): void => {
       let item: R = this.intoR(base);
       callback.call(thisArg, item, item, this);
     });
@@ -98,15 +99,15 @@ export class FilePath {
   }
 
   public static fromUri(uri: vscode.Uri): FilePath {
-    if (uri.scheme !== 'file') {
+    if (uri.scheme !== "file") {
       throw new Error(`Attempted to convert a non-file uri to a local path: ${uri}`);
     }
     return FilePath.fromPath(uri.fsPath);
   }
 
   public static fromUnixy(path: string): FilePath {
-    if (process.platform === 'win32') {
-      return FilePath.fromPath(path.replace(/\//g, '\\'));
+    if (process.platform === "win32") {
+      return FilePath.fromPath(path.replace(/\//g, "\\"));
     }
     return FilePath.fromPath(path);
   }
@@ -116,8 +117,8 @@ export class FilePath {
   }
 
   public toUnixy(): string {
-    if (process.platform === 'win32') {
-      return this.toPath().replace(/\\/g, '/');
+    if (process.platform === "win32") {
+      return this.toPath().replace(/\\/g, "/");
     }
     return this.toPath();
   }
@@ -135,12 +136,6 @@ export class FilePath {
   }
 
   public changeType(newType: string): FilePath {
-    let path: string = this.toPath();
-    let ext: string = this.extname();
-    if (ext) {
-      path = path.substring(0, path.length - ext.length);
-    }
-
     return FilePath.fromPath(`${this.toPath()}.${newType}`);
   }
 
@@ -198,7 +193,7 @@ export class FilePathSet extends TranslatedSet<string, FilePath> {
     super(
       (path: FilePath): string => path.toPath(),
       (str: string): FilePath => FilePath.fromPath(str),
-      from
+      from,
     );
   }
 }

@@ -11,9 +11,9 @@ export function bashShellParse(cmdLine: string): string[] {
   }
 
   let results: string[] = [];
-  let current: string = '';
-  let blockStart: number = 0;
-  let pos: number = 0;
+  let current = "";
+  let blockStart = 0;
+  let pos = 0;
   let state: State = State.Base;
 
   // Add the current block to the argument.
@@ -33,19 +33,19 @@ export function bashShellParse(cmdLine: string): string[] {
     }
 
     // Onto the next argument.
-    current = '';
+    current = "";
   }
 
   // What is it escaping?
-  function escaped(): string|undefined {
-    if (state === State.Single || state === State.Base || (pos + 1) >= cmdLine.length) {
+  function escaped(): string | undefined {
+    if (state === State.Single || state === State.Base || pos + 1 >= cmdLine.length) {
       return undefined;
     }
 
     let next: string = cmdLine.charAt(pos + 1);
     if (state === State.Double) {
       // In double quotes only some things can be escaped.
-      if (next === '"' || next === '\\' || next === '\n') {
+      if (next === "\"" || next === "\\" || next === "\n") {
         return next;
       }
       return undefined;
@@ -56,13 +56,13 @@ export function bashShellParse(cmdLine: string): string[] {
 
   while (pos < cmdLine.length) {
     let char: string = cmdLine.charAt(pos);
-    let escape: string|undefined = char === '\\' ? escaped() : undefined;
+    let escape: string | undefined = char === "\\" ? escaped() : undefined;
 
     if (escape) {
       // Cache up to here.
       addBlock();
 
-      if (escape === '\n') {
+      if (escape === "\n") {
         // Entirely skip the newline.
         blockStart++;
       }
@@ -75,7 +75,7 @@ export function bashShellParse(cmdLine: string): string[] {
     switch (state) {
       case State.Base: {
         // Still not in an argument?
-        if (char === ' ' || char === '\t' || char === '\n') {
+        if (char === " " || char === "\t" || char === "\n") {
           pos++;
           continue;
         }
@@ -89,15 +89,15 @@ export function bashShellParse(cmdLine: string): string[] {
         break;
       }
       case State.Normal: {
-        if (char === ' ' || char === '\t' || char === '\n') {
+        if (char === " " || char === "\t" || char === "\n") {
           // Found the end of the argument.
           push();
           state = State.Base;
-        } else if (char === '\'') {
+        } else if (char === "'") {
           // Start of a single-quoted block.
           addBlock();
           state = State.Single;
-        } else if (char === '"') {
+        } else if (char === "\"") {
           // Start of a double-quoted block.
           addBlock();
           state = State.Double;
@@ -107,7 +107,7 @@ export function bashShellParse(cmdLine: string): string[] {
         break;
       }
       case State.Single: {
-        if (char === '\'') {
+        if (char === "'") {
           // End of the block.
           addBlock();
           state = State.Normal;
@@ -115,7 +115,7 @@ export function bashShellParse(cmdLine: string): string[] {
         break;
       }
       case State.Double: {
-        if (char === '"') {
+        if (char === "\"") {
           // End of the block.
           addBlock();
           state = State.Normal;
@@ -142,11 +142,11 @@ export function winShellParse(cmdLine: string): string[] {
   }
 
   let results: string[] = [];
-  let current: string = '';
-  let blockStart: number = 0;
-  let pos: number = 0;
+  let current = "";
+  let blockStart = 0;
+  let pos = 0;
   let state: State = State.Base;
-  let escapeCount: number = 0;
+  let escapeCount = 0;
 
   // Add the current block to the argument.
   function addBlock(): void {
@@ -156,7 +156,7 @@ export function winShellParse(cmdLine: string): string[] {
 
   // Adds any pending escape characters.
   function addEscapes(): void {
-    current += '\\'.repeat(escapeCount);
+    current += "\\".repeat(escapeCount);
     escapeCount = 0;
   }
 
@@ -168,13 +168,13 @@ export function winShellParse(cmdLine: string): string[] {
     }
 
     // Onto the next argument.
-    current = '';
+    current = "";
   }
 
   while (pos < cmdLine.length) {
     let char: string = cmdLine.charAt(pos);
 
-    if (char === '\\') {
+    if (char === "\\") {
       if (escapeCount === 0) {
         if (state !== State.Base) {
           addBlock();
@@ -184,7 +184,7 @@ export function winShellParse(cmdLine: string): string[] {
       }
 
       escapeCount++;
-    } else if (char === '"') {
+    } else if (char === "\"") {
       if (escapeCount % 2) {
         // An escaped double quote.
         escapeCount = (escapeCount - 1) / 2;
@@ -195,7 +195,7 @@ export function winShellParse(cmdLine: string): string[] {
       } else {
         if (escapeCount) {
           // An unescaped double quote.
-          escapeCount = escapeCount / 2;
+          escapeCount /= 2;
           addEscapes();
         } else if (state !== State.Base) {
           addBlock();
@@ -216,7 +216,7 @@ export function winShellParse(cmdLine: string): string[] {
         blockStart = pos;
       }
 
-      if (char === ' ' || char === '\t') {
+      if (char === " " || char === "\t") {
         if (state === State.Normal) {
           // Found the end of the argument.
           addBlock();
@@ -243,67 +243,67 @@ export function winShellParse(cmdLine: string): string[] {
 }
 
 export function shellParse(cmdLine: string): string[] {
-  if (process.platform === 'win32') {
+  if (process.platform === "win32") {
     return winShellParse(cmdLine);
   }
   return bashShellParse(cmdLine);
 }
 
 export function bashShellQuote(args: string[]): string {
-  return args.map((a) => {
+  return args.map((a: string): string => {
     function contains(str: string): boolean {
-      for (let i: number = 0; i < str.length; i++) {
-        if (a.indexOf(str.charAt(i)) >= 0) {
+      for (let i = 0; i < str.length; i++) {
+        if (a.includes(str.charAt(i))) {
           return true;
         }
       }
       return false;
     }
 
-    if (!contains('"\' \\()')) {
+    if (!contains("\"' \\()")) {
       return a;
     }
 
-    if (!contains('\'')) {
+    if (!contains("'")) {
       return `'${a}'`;
     }
 
-    return '"' + a.replace(/\\/g, '\\\\').replace(/[()"\n]/g, '\\$&') + '"';
-  }).join(' ');
+    return "\"" + a.replace(/\\/g, "\\\\").replace(/[()"\n]/g, "\\$&") + "\"";
+  }).join(" ");
 }
 
 export function winShellQuote(args: string[]): string {
-  return args.map((a) => {
+  return args.map((a: string): string => {
     function contains(str: string): boolean {
-      for (let i: number = 0; i < str.length; i++) {
-        if (a.indexOf(str.charAt(i)) >= 0) {
+      for (let i = 0; i < str.length; i++) {
+        if (a.includes(str.charAt(i))) {
           return true;
         }
       }
       return false;
     }
 
-    if (!contains('"\' \\')) {
+    if (!contains("\"' \\")) {
       return a;
     }
 
-    let escaped: string = a.replace(/\\*"|\\+/g, (match, ..._args: any[]) => {
-      if (!match.endsWith('\\')) {
+    let escaped: string = a.replace(/\\*"|\\+/g, (match: string): string => {
+      if (!match.endsWith("\\")) {
         let count: number = match.length - 1;
-        return '\\'.repeat((count * 2) + 1) + '"';
+        return "\\".repeat(count * 2 + 1) + "\"";
       }
       return match;
     });
-      
-    if (contains(' ')) {
-      return '"' + escaped + '"';
+
+    if (contains(" ")) {
+      return "\"" + escaped + "\"";
     }
     return escaped;
-  }).join(' ');
+  }).join(" ");
 }
 
 export function shellQuote(args: string[]): string {
-  if (process.platform === 'win32') {
+  if (process.platform === "win32") {
     return winShellQuote(args);
   }
   return bashShellQuote(args);
