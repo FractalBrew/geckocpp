@@ -1,9 +1,9 @@
 # Mozilla C++ intellisense provider for Visual Studio Code
 
 [![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/fractalbrew.mozillacpp.svg?style=popout)](https://marketplace.visualstudio.com/items?itemName=fractalbrew.mozillacpp)
-[![Blocking issues](https://img.shields.io/github/issues-raw/fractalbrew/vscode-mozillacpp/blocking.svg?style=popout)](https://github.com/FractalBrew/vscode-mozillacpp/issues?q=is%3Aopen+is%3Aissue+label%3Ablocking)
-[![Open issues](https://img.shields.io/github/issues-raw/fractalbrew/vscode-mozillacpp.svg?style=popout)](https://github.com/FractalBrew/vscode-mozillacpp/issues)
-[![GitHub pull requests](https://img.shields.io/github/issues-pr-raw/fractalbrew/vscode-mozillacpp.svg?style=popout)](https://github.com/FractalBrew/vscode-mozillacpp/pulls)
+[![Blocking issues](https://img.shields.io/github/issues-raw/mossop/vscode-mozillacpp/blocking.svg?style=popout)](https://github.com/Mossop/vscode-mozillacpp/issues?q=is%3Aopen+is%3Aissue+label%3Ablocking)
+[![Open issues](https://img.shields.io/github/issues-raw/mossop/vscode-mozillacpp.svg?style=popout)](https://github.com/Mossop/vscode-mozillacpp/issues)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr-raw/mossop/vscode-mozillacpp.svg?style=popout)](https://github.com/Mossop/vscode-mozillacpp/pulls)
 
 With generated headers, external build directories and a non-standard build
 configuration it is near impossible for standard tools to understand Mozilla's
@@ -15,7 +15,7 @@ you open and then letting the C/C++ extension do the hard work of parsing and
 generating errors and intellisense data for the editor based on that
 information.
 
-This extension should be considered an early release, please [file issues](https://github.com/FractalBrew/vscode-mozillacpp/issues/new)
+This extension should be considered an early release, please [file issues](https://github.com/Mossop/vscode-mozillacpp/issues/new)
 where Visual Studio Code doesn't understand your code as you find them.
 
 This extension has only been tested with builds that use the clang compiler.
@@ -57,10 +57,10 @@ only needed for debugging.
 
 ## Known issues
 
-Generally check the [Github issues](https://github.com/FractalBrew/vscode-mozillacpp/issues).
+Generally check the [Github issues](https://github.com/Mossop/vscode-mozillacpp/issues).
 
 The main issue of note is that it seems to [take a while for Visual Studio Code
-to catch up with changes to the build configuration](https://github.com/FractalBrew/vscode-mozillacpp/issues/8).
+to catch up with changes to the build configuration](https://github.com/Mossop/vscode-mozillacpp/issues/8).
 This doesn't appear to be an issue that this extension can do anything about
 though.
 
