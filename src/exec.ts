@@ -4,10 +4,11 @@
 
 import { ChildProcess, spawn } from "child_process";
 
+import { bashShellQuote } from "shell-args";
+
 import { config, Level } from "./config";
 import { log, LogItem, LogItemImpl } from "./logging";
 import { FilePath } from "./shared";
-import { bashShellQuote } from "./shell";
 
 function lineSplit(data: string): string[] {
   let results: string[] = [];

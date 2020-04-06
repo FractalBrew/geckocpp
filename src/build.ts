@@ -5,6 +5,7 @@
 import { Stats, promises as fs } from "fs";
 import * as path from "path";
 
+import { bashShellParse } from "shell-args";
 import { JsonDecoder } from "ts.data.json";
 import * as vscode from "vscode";
 import { SourceFileConfiguration } from "vscode-cpptools";
@@ -14,7 +15,6 @@ import { config } from "./config";
 import { ProcessResult, exec, CmdArg } from "./exec";
 import { log } from "./logging";
 import { Disposable, StateProvider, FilePath, FilePathSet } from "./shared";
-import { bashShellParse } from "./shell";
 
 interface MozConfig {
   configure_args: string[];

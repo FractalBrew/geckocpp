@@ -4,13 +4,13 @@
 
 import { promises as fs, Stats } from "fs";
 
+import { shellParse } from "shell-args";
 import * as vscode from "vscode";
 
 import { FileType } from "./compiler";
 import { CmdArg } from "./exec";
 import { SourceFolder } from "./folders";
 import { FilePath, StateProvider, Disposable } from "./shared";
-import { shellParse } from "./shell";
 import { workspace } from "./workspace";
 
 export enum Level {

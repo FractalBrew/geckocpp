@@ -2,13 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { shellQuote } from "shell-args";
 import { SourceFileConfiguration } from "vscode-cpptools";
 
 import { config } from "./config";
 import { ProcessResult, exec, CmdArg, ProcessError } from "./exec";
 import { log } from "./logging";
 import { FilePath, Disposable, StateProvider, FilePathSet } from "./shared";
-import { shellQuote } from "./shell";
 
 type VERSIONS = "c89" | "c99" | "c11" | "c++98" | "c++03" | "c++11" | "c++14" | "c++17";
 type INTELLISENSE_MODES = "msvc-x64" | "gcc-x64" | "clang-x64";
